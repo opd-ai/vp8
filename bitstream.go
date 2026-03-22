@@ -74,21 +74,18 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi int, numMBs int, mbs 
 	// prob_skip_false (8 bits): set high so most MBs are marked as skip
 	enc.putLiteral(255, 8)
 
-	// Macroblock-level data (simplified: all MBs use DC_PRED + skip).
-	// y_mode for each MB: we signal intra_16x16 mode DC_PRED (0).
-	// Because all macroblocks skip (no residuals), we just encode:
-	//   skip_coeff = 1 for every MB.
-	for range mbs {
-		// skip_coeff (1 bit, prob = prob_skip_false = 255):
-		// putBit(255, false) encodes skip_coeff=0, meaning "skip residuals"
-		// (no non-zero coefficients in this macroblock).
-		enc.putBit(255, false)
-		// Encode intra_mb_mode: for skipped MBs in a key frame,
-		// the decoder still needs the prediction mode.
-		// y_mode: 4 modes coded via a tree. DC_PRED = 0 (first branch false).
+	// Macroblock-level data: each MB uses DC_PRED with all residuals skipped.
+	for _, mb := range mbs {
+		// coeff_skip (1 bit, prob = prob_skip_false = 255):
+		// A value of 1 (true) means the macroblock has no non-zero DCT
+		// coefficients and the residual partition is not read for this MB.
+		enc.putBit(255, mb.skip)
+		// Encode intra_mb_mode: the decoder still needs the prediction mode
+		// even for skipped macroblocks.
+		// y_mode: coded via a probability tree. DC_PRED is the first branch.
 		enc.putBit(145, false) // y_mode != B_PRED (use 16x16 mode)
 		enc.putBit(156, false) // DC_PRED (not V_PRED)
-		// uv_mode: DC_PRED (also first tree branch false).
+		// uv_mode: DC_PRED (first tree branch false).
 		enc.putBit(142, false) // DC_PRED
 	}
 }
@@ -106,8 +103,10 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 	encodeFrameHeader(partEnc, width, height, qi, len(mbs), mbs)
 	firstPart := partEnc.flush()
 
-	// Second partition (residual data): empty because all MBs are skipped.
-	secondPart := newBoolEncoder().flush()
+	// Second partition (residual data): no tokens are written because all
+	// macroblocks are marked as skip (coeff_skip=1), so no DCT coefficients
+	// are present. The partition is therefore empty.
+	secondPart := []byte{}
 
 	firstPartSize := len(firstPart)
 

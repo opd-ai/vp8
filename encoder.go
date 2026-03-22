@@ -25,12 +25,11 @@ import (
 
 // Encoder encodes raw YUV420 frames into VP8 key-frame bitstreams.
 type Encoder struct {
-	width    int
-	height   int
-	fps      int
-	bitrate  int  // target bitrate in bits/s (used to derive quantizer)
-	qi       int  // quantizer index [0, 127]
-	forceKey bool // force next frame to be a key frame (always true here)
+	width   int
+	height  int
+	fps     int
+	bitrate int // target bitrate in bits/s (used to derive quantizer)
+	qi      int // quantizer index [0, 127]
 }
 
 // NewEncoder creates a new VP8 Encoder for frames of the given dimensions
@@ -48,12 +47,11 @@ func NewEncoder(width, height, fps int) (*Encoder, error) {
 		return nil, errors.New("vp8: fps must be positive")
 	}
 	return &Encoder{
-		width:    width,
-		height:   height,
-		fps:      fps,
-		bitrate:  500_000, // default 500 kbps
-		qi:       24,      // default quantizer index
-		forceKey: true,
+		width:   width,
+		height:  height,
+		fps:     fps,
+		bitrate: 500_000, // default 500 kbps
+		qi:      24,      // default quantizer index
 	}, nil
 }
 
@@ -77,9 +75,7 @@ func (e *Encoder) SetBitrate(bitrate int) {
 // ForceKeyFrame causes the next call to Encode to produce a key frame.
 // In this implementation every frame is already a key frame, so this is
 // a no-op kept for API compatibility.
-func (e *Encoder) ForceKeyFrame() {
-	e.forceKey = true
-}
+func (e *Encoder) ForceKeyFrame() {}
 
 // Encode encodes a raw YUV420 (I420) frame and returns a VP8 key-frame
 // bitstream. The yuv slice must be at least width*height*3/2 bytes long,
@@ -87,20 +83,18 @@ func (e *Encoder) ForceKeyFrame() {
 //
 // The returned bytes can be passed directly to pion/rtp's VP8Payloader.Payload.
 func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
-	f, err := NewYUV420Frame(yuv, e.width, e.height)
-	if err != nil {
+	// Validate input buffer size against configured dimensions.
+	if _, err := NewYUV420Frame(yuv, e.width, e.height); err != nil {
 		return nil, err
 	}
 
 	mbW := (e.width + 15) / 16
 	mbH := (e.height + 15) / 16
-	qp := quantIndexToQp(e.qi)
 
-	mbs := make([]macroblock, 0, mbW*mbH)
-	for by := 0; by < mbH; by++ {
-		for bx := 0; bx < mbW; bx++ {
-			mbs = append(mbs, processMacroblock(f, bx, by, qp))
-		}
+	numMBs := mbW * mbH
+	mbs := make([]macroblock, numMBs)
+	for i := range mbs {
+		mbs[i] = processMacroblock()
 	}
 
 	return BuildKeyFrame(e.width, e.height, e.qi, mbs)

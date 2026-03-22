@@ -107,12 +107,22 @@ func TestForceKeyFrame(t *testing.T) {
 }
 
 func TestNewYUV420Frame(t *testing.T) {
-	// Too small
+	// Too small buffer
 	_, err := NewYUV420Frame(make([]byte, 10), 640, 480)
 	if err == nil {
 		t.Error("expected error for undersized buffer")
 	}
-	// Exact size
+	// Zero dimensions
+	_, err = NewYUV420Frame(make([]byte, 100), 0, 480)
+	if err == nil {
+		t.Error("expected error for zero width")
+	}
+	// Odd dimensions
+	_, err = NewYUV420Frame(make([]byte, 641*480*3/2), 641, 480)
+	if err == nil {
+		t.Error("expected error for odd width")
+	}
+	// Exact size, valid dimensions
 	yuv := make([]byte, 640*480*3/2)
 	f, err := NewYUV420Frame(yuv, 640, 480)
 	if err != nil {

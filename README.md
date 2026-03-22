@@ -80,7 +80,7 @@ The returned byte slice is a raw VP8 bitstream as described in RFC 6386:
 ```
 [3-byte frame tag][3-byte start code 9D 01 2A][2-byte width][2-byte height]
 [first partition (bool-encoded header + MB modes)]
-[second partition (empty — all MBs skipped)]
+[second partition (empty — all MBs have coeff_skip=1, so no DCT tokens are present)]
 ```
 
 ## License

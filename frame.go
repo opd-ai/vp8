@@ -26,7 +26,11 @@ type Frame struct {
 
 // NewYUV420Frame creates a Frame from a packed YUV420 (I420) byte slice.
 // The expected layout is: Y plane, then Cb plane, then Cr plane.
+// Width and height must be positive even integers.
 func NewYUV420Frame(yuv []byte, width, height int) (*Frame, error) {
+	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
+		return nil, errInvalidDimensions
+	}
 	ySize := width * height
 	uvSize := (width / 2) * (height / 2)
 	if len(yuv) < ySize+2*uvSize {
