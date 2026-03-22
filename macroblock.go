@@ -21,9 +21,9 @@ func dct4x4(in [16]int16) [16]int16 {
 		c := int32(in[i*4+1] - in[i*4+2])
 		d := int32(in[i*4+0] - in[i*4+3])
 		tmp[i*4+0] = int16(a + b)
-		tmp[i*4+1] = int16(c + d + (d >> 31 & 1)) // c + d rounded
+		tmp[i*4+1] = int16(c + d)
 		tmp[i*4+2] = int16(a - b)
-		tmp[i*4+3] = int16(d - c + (c >> 31 & 1))
+		tmp[i*4+3] = int16(d - c)
 	}
 	var out [16]int16
 	// Column transform
