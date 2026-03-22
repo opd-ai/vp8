@@ -50,7 +50,7 @@ func quantize(coeff int16, step int16) int16 {
 		sign = -1
 		coeff = -coeff
 	}
-	return sign * (coeff / step)
+	return sign * ((coeff + step/2) / step)
 }
 
 // processMacroblock builds a macroblock descriptor for a 16x16 block

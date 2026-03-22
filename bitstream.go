@@ -80,8 +80,9 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi int, numMBs int, mbs 
 	//   skip_coeff = 1 for every MB.
 	for range mbs {
 		// skip_coeff (1 bit, prob = prob_skip_false = 255):
-		// prob 255 means P(skip=0) ≈ 255/256 ≈ 1, so bit=false means skip.
-		enc.putBit(255, false) // skip this macroblock's residuals
+		// putBit(255, false) encodes skip_coeff=0, meaning "skip residuals"
+		// (no non-zero coefficients in this macroblock).
+		enc.putBit(255, false)
 		// Encode intra_mb_mode: for skipped MBs in a key frame,
 		// the decoder still needs the prediction mode.
 		// y_mode: 4 modes coded via a tree. DC_PRED = 0 (first branch false).

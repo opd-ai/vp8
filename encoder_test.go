@@ -138,6 +138,25 @@ func TestEncodeSmallFrame(t *testing.T) {
 	}
 }
 
+func TestQuantIndexToQp(t *testing.T) {
+	tests := []struct {
+		qi      int
+		wantMin int16
+	}{
+		{0, 4},   // lower bound → minimum step size
+		{1, 4},   // just above lower bound
+		{127, 1}, // upper bound → maximum step size (≥ 1)
+		{24, 4},  // typical default qi → positive step size
+	}
+	for _, tt := range tests {
+		got := quantIndexToQp(tt.qi)
+		if got < tt.wantMin {
+			t.Errorf("quantIndexToQp(%d) = %d, want >= %d", tt.qi, got, tt.wantMin)
+		}
+	}
+}
+
+
 func BenchmarkEncode640x480(b *testing.B) {
 	enc, _ := NewEncoder(640, 480, 30)
 	yuv := makeYUV420(640, 480, 128)

@@ -46,6 +46,9 @@ func predictDC(above []byte, left []byte, haveAbove, haveLeft bool) byte {
 		}
 		n += len(left)
 	}
+	if n == 0 {
+		return 128
+	}
 	return byte((sum + n/2) / n)
 }
 
