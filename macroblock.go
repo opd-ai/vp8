@@ -24,4 +24,3 @@ func processMacroblock() macroblock {
 		dcValue:    0, // residuals are not encoded in this encoder
 	}
 }
-

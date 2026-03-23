@@ -28,7 +28,7 @@ const (
 
 // predictDC fills a 16x16 block with a DC value derived from above/left samples.
 // For simplicity (boundary macroblocks with no neighbours) we use 128.
-func predictDC(above []byte, left []byte, haveAbove, haveLeft bool) byte {
+func predictDC(above, left []byte, haveAbove, haveLeft bool) byte {
 	if !haveAbove && !haveLeft {
 		return 128
 	}

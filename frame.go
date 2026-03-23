@@ -18,7 +18,7 @@ type Frame struct {
 	// Cb is the Cb chroma plane. Length must be (Width/2) * (Height/2).
 	Cb []byte
 	// Cr is the Cr chroma plane. Length must be (Width/2) * (Height/2).
-	Cr []byte
+	Cr     []byte
 	Width  int
 	Height int
 	Type   FrameType

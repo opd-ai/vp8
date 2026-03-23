@@ -30,7 +30,7 @@ func quantIndexToQp(qi int) int16 {
 // first partition. It encodes the minimum required fields so that a
 // conformant VP8 decoder can parse the bitstream.
 // Reference: RFC 6386, Section 9.2.
-func encodeFrameHeader(enc *boolEncoder, width, height, qi int, numMBs int, mbs []macroblock) {
+func encodeFrameHeader(enc *boolEncoder, width, height, qi, numMBs int, mbs []macroblock) {
 	// color_space (1 bit): 0 = BT.601
 	enc.putBit(128, false)
 	// clamping_type (1 bit): 0 = clamped
@@ -115,9 +115,9 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 	//   bits [3:1]:   version = 0
 	//   bits [4]:     show_frame = 1
 	//   bits [23:5]:  first_part_size
-	tag := uint32(0)          // key_frame = 0
-	tag |= 0 << 1             // version = 0
-	tag |= 1 << 4             // show_frame = 1
+	tag := uint32(0)                  // key_frame = 0
+	tag |= 0 << 1                     // version = 0
+	tag |= 1 << 4                     // show_frame = 1
 	tag |= uint32(firstPartSize) << 5 // first_part_size
 
 	out := make([]byte, 0, 3+3+4+firstPartSize+len(secondPart))

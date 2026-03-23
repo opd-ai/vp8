@@ -21,9 +21,9 @@ func makeYUV420(width, height int, lumaVal byte) []byte {
 
 func TestNewEncoder(t *testing.T) {
 	tests := []struct {
-		name        string
-		w, h, fps   int
-		wantErr     bool
+		name      string
+		w, h, fps int
+		wantErr   bool
 	}{
 		{"valid 640x480 30fps", 640, 480, 30, false},
 		{"valid 1280x720 30fps", 1280, 720, 30, false},
@@ -165,7 +165,6 @@ func TestQuantIndexToQp(t *testing.T) {
 		}
 	}
 }
-
 
 func BenchmarkEncode640x480(b *testing.B) {
 	enc, _ := NewEncoder(640, 480, 30)
