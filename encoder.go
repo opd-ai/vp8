@@ -84,20 +84,144 @@ func (e *Encoder) ForceKeyFrame() {}
 // The returned bytes can be passed directly to pion/rtp's VP8Payloader.Payload.
 func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 	// Validate input buffer size against configured dimensions.
-	if _, err := NewYUV420Frame(yuv, e.width, e.height); err != nil {
+	frame, err := NewYUV420Frame(yuv, e.width, e.height)
+	if err != nil {
 		return nil, err
 	}
 
 	mbW := (e.width + 15) / 16
 	mbH := (e.height + 15) / 16
 
+	// Get quantization factors for the current quantizer index
+	qf := GetQuantFactorsSimple(e.qi)
+
+	// Chroma dimensions (half of luma)
+	chromaW := e.width / 2
+	chromaH := e.height / 2
+
 	numMBs := mbW * mbH
 	mbs := make([]macroblock, numMBs)
-	for i := range mbs {
-		mbs[i] = processMacroblock()
+
+	for mbY := 0; mbY < mbH; mbY++ {
+		for mbX := 0; mbX < mbW; mbX++ {
+			mbIdx := mbY*mbW + mbX
+
+			// Extract 16x16 luma block
+			var srcY [256]byte
+			for row := 0; row < 16; row++ {
+				srcRow := mbY*16 + row
+				if srcRow >= e.height {
+					srcRow = e.height - 1
+				}
+				for col := 0; col < 16; col++ {
+					srcCol := mbX*16 + col
+					if srcCol >= e.width {
+						srcCol = e.width - 1
+					}
+					srcY[row*16+col] = frame.Y[srcRow*e.width+srcCol]
+				}
+			}
+
+			// Extract 8x8 chroma blocks (U and V)
+			var srcU, srcV [64]byte
+			for row := 0; row < 8; row++ {
+				srcRow := mbY*8 + row
+				if srcRow >= chromaH {
+					srcRow = chromaH - 1
+				}
+				for col := 0; col < 8; col++ {
+					srcCol := mbX*8 + col
+					if srcCol >= chromaW {
+						srcCol = chromaW - 1
+					}
+					srcU[row*8+col] = frame.Cb[srcRow*chromaW+srcCol]
+					srcV[row*8+col] = frame.Cr[srcRow*chromaW+srcCol]
+				}
+			}
+
+			// Build neighbor context
+			ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
+
+			// Process the macroblock
+			mbs[mbIdx] = processMacroblock(srcY[:], srcU[:], srcV[:], ctx, qf)
+		}
 	}
 
 	return BuildKeyFrame(e.width, e.height, e.qi, mbs)
+}
+
+// buildMBContext extracts neighbor pixels for prediction.
+func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContext {
+	ctx := &mbContext{}
+
+	chromaW := e.width / 2
+
+	// Extract luma neighbors (16 pixels above, 16 to the left)
+	if mbY > 0 {
+		ctx.lumaAbove = make([]byte, 16)
+		aboveRow := (mbY*16 - 1) * e.width
+		for i := 0; i < 16; i++ {
+			col := mbX*16 + i
+			if col < e.width {
+				ctx.lumaAbove[i] = frame.Y[aboveRow+col]
+			}
+		}
+	}
+
+	if mbX > 0 {
+		ctx.lumaLeft = make([]byte, 16)
+		leftCol := mbX*16 - 1
+		for i := 0; i < 16; i++ {
+			row := mbY*16 + i
+			if row < e.height {
+				ctx.lumaLeft[i] = frame.Y[row*e.width+leftCol]
+			}
+		}
+	}
+
+	if mbX > 0 && mbY > 0 {
+		ctx.lumaTopLeft = frame.Y[(mbY*16-1)*e.width+(mbX*16-1)]
+	} else {
+		ctx.lumaTopLeft = 128
+	}
+
+	// Extract chroma neighbors (8 pixels above, 8 to the left)
+	if mbY > 0 {
+		ctx.chromaAboveU = make([]byte, 8)
+		ctx.chromaAboveV = make([]byte, 8)
+		aboveRow := (mbY*8 - 1) * chromaW
+		for i := 0; i < 8; i++ {
+			col := mbX*8 + i
+			if col < chromaW {
+				ctx.chromaAboveU[i] = frame.Cb[aboveRow+col]
+				ctx.chromaAboveV[i] = frame.Cr[aboveRow+col]
+			}
+		}
+	}
+
+	if mbX > 0 {
+		ctx.chromaLeftU = make([]byte, 8)
+		ctx.chromaLeftV = make([]byte, 8)
+		leftCol := mbX*8 - 1
+		chromaH := e.height / 2
+		for i := 0; i < 8; i++ {
+			row := mbY*8 + i
+			if row < chromaH {
+				ctx.chromaLeftU[i] = frame.Cb[row*chromaW+leftCol]
+				ctx.chromaLeftV[i] = frame.Cr[row*chromaW+leftCol]
+			}
+		}
+	}
+
+	if mbX > 0 && mbY > 0 {
+		ctx.chromaTopLeftU = frame.Cb[(mbY*8-1)*chromaW+(mbX*8-1)]
+		ctx.chromaTopLeftV = frame.Cr[(mbY*8-1)*chromaW+(mbX*8-1)]
+	} else {
+		ctx.chromaTopLeftU = 128
+		ctx.chromaTopLeftV = 128
+	}
+
+	return ctx
 }
 
 // Width returns the configured frame width in pixels.

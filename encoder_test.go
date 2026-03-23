@@ -1,7 +1,11 @@
 package vp8
 
 import (
+	"bytes"
+	"math"
 	"testing"
+
+	"golang.org/x/image/vp8"
 )
 
 // makeYUV420 creates a synthetic YUV420 frame of the given dimensions.
@@ -175,4 +179,130 @@ func BenchmarkEncode640x480(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// makeGradientYUV420 creates a synthetic gradient YUV420 frame.
+// The luma plane has a horizontal gradient from left to right.
+func makeGradientYUV420(width, height int) []byte {
+	ySize := width * height
+	uvSize := (width / 2) * (height / 2)
+	buf := make([]byte, ySize+2*uvSize)
+	// Luma: horizontal gradient 16-235 (studio swing)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			val := 16 + int(float64(x)/float64(width-1)*219)
+			buf[y*width+x] = byte(val)
+		}
+	}
+	// Chroma: neutral gray (128)
+	for i := ySize; i < len(buf); i++ {
+		buf[i] = 128
+	}
+	return buf
+}
+
+// TestDecodeVerification encodes a frame and verifies it decodes correctly
+// with golang.org/x/image/vp8, validating WebRTC compatibility.
+func TestDecodeVerification(t *testing.T) {
+	tests := []struct {
+		name    string
+		width   int
+		height  int
+		makeYUV func(w, h int) []byte
+		minPSNR float64 // minimum expected PSNR in dB
+	}{
+		{
+			name:    "solid gray 64x64",
+			width:   64,
+			height:  64,
+			makeYUV: func(w, h int) []byte { return makeYUV420(w, h, 128) },
+			minPSNR: 20.0,
+		},
+		{
+			name:    "gradient 64x64",
+			width:   64,
+			height:  64,
+			makeYUV: makeGradientYUV420,
+			minPSNR: 15.0, // gradients have more quantization error
+		},
+		{
+			name:    "solid gray 320x240",
+			width:   320,
+			height:  240,
+			makeYUV: func(w, h int) []byte { return makeYUV420(w, h, 128) },
+			minPSNR: 20.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enc, err := NewEncoder(tt.width, tt.height, 30)
+			if err != nil {
+				t.Fatalf("NewEncoder: %v", err)
+			}
+
+			// Create source YUV frame
+			srcYUV := tt.makeYUV(tt.width, tt.height)
+
+			// Encode
+			vp8Data, err := enc.Encode(srcYUV)
+			if err != nil {
+				t.Fatalf("Encode: %v", err)
+			}
+
+			// Decode with golang.org/x/image/vp8
+			dec := vp8.NewDecoder()
+			dec.Init(bytes.NewReader(vp8Data), len(vp8Data))
+
+			fh, err := dec.DecodeFrameHeader()
+			if err != nil {
+				t.Fatalf("DecodeFrameHeader: %v", err)
+			}
+
+			// Verify dimensions match
+			if fh.Width != tt.width || fh.Height != tt.height {
+				t.Errorf("decoded dimensions %dx%d, want %dx%d",
+					fh.Width, fh.Height, tt.width, tt.height)
+			}
+
+			// Verify key frame
+			if !fh.KeyFrame {
+				t.Error("expected key frame")
+			}
+
+			// Decode the frame
+			decoded, err := dec.DecodeFrame()
+			if err != nil {
+				t.Fatalf("DecodeFrame: %v", err)
+			}
+
+			// Calculate PSNR between source and decoded luma
+			psnr := calculatePSNR(srcYUV[:tt.width*tt.height], decoded.Y, tt.width, tt.height, decoded.YStride)
+			t.Logf("PSNR: %.2f dB (min: %.2f)", psnr, tt.minPSNR)
+
+			if psnr < tt.minPSNR {
+				t.Errorf("PSNR %.2f dB below threshold %.2f dB", psnr, tt.minPSNR)
+			}
+		})
+	}
+}
+
+// calculatePSNR computes Peak Signal-to-Noise Ratio between two images.
+func calculatePSNR(src, dst []byte, width, height, dstStride int) float64 {
+	var mse float64
+	count := 0
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			srcVal := float64(src[y*width+x])
+			dstVal := float64(dst[y*dstStride+x])
+			diff := srcVal - dstVal
+			mse += diff * diff
+			count++
+		}
+	}
+	mse /= float64(count)
+	if mse == 0 {
+		return 100.0 // perfect match
+	}
+	return 10.0 * math.Log10(255.0*255.0/mse)
 }

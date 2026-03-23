@@ -30,62 +30,89 @@ roughly in dependency order.
 
 > Goal: produce fully spec-conformant I-frames with actual pixel fidelity.
 
-### 1.1 Accurate dequantization / quantizer tables
+### 1.1 Accurate dequantization / quantizer tables ✅
 
-- Replace the linear `quantIndexToQp` approximation with the exact lookup tables from
-  RFC 6386 §14 (separate DC and AC step sizes for Y, Y2, UV planes).
-- Map `qi` → `{y_dc_q, y_ac_q, y2_dc_q, y2_ac_q, uv_dc_q, uv_ac_q}`.
-- Expose per-plane quantizer deltas (`y_dc_delta`, `y2_dc_delta`, `y2_ac_delta`,
-  `uv_dc_delta`, `uv_ac_delta`) in the frame header.
+- ~~Replace the linear `quantIndexToQp` approximation with the exact lookup tables from
+  RFC 6386 §14 (separate DC and AC step sizes for Y, Y2, UV planes).~~
+- ~~Map `qi` → `{y_dc_q, y_ac_q, y2_dc_q, y2_ac_q, uv_dc_q, uv_ac_q}`.~~
+- ~~Expose per-plane quantizer deltas (`y_dc_delta`, `y2_dc_delta`, `y2_ac_delta`,
+  `uv_dc_delta`, `uv_ac_delta`) in the frame header.~~
 
-### 1.2 All 16×16 intra prediction modes
+**Implemented in `quant.go`**: `dcQLookup`, `acQLookup` tables from RFC 6386, 
+`QuantFactors` struct, `GetQuantFactors()` and `GetQuantFactorsSimple()` functions
+with proper scaling and clamping for Y2 and UV planes.
 
-- Implement V_PRED, H_PRED, TM_PRED (in addition to the existing DC_PRED) for
-  16×16 luma blocks (RFC 6386 §12.1).
-- Implement the corresponding chroma predictors (V_PRED_CHROMA, H_PRED_CHROMA,
-  TM_PRED_CHROMA) for 8×8 UV blocks (RFC 6386 §12.2).
-- Pick the mode that minimises sum-of-absolute-differences (SAD) between the
-  predicted and source block.
+### 1.2 All 16×16 intra prediction modes ✅
 
-### 1.3 4×4 intra prediction sub-modes (B_PRED)
+- ~~Implement V_PRED, H_PRED, TM_PRED (in addition to the existing DC_PRED) for
+  16×16 luma blocks (RFC 6386 §12.1).~~
+- ~~Implement the corresponding chroma predictors (V_PRED_CHROMA, H_PRED_CHROMA,
+  TM_PRED_CHROMA) for 8×8 UV blocks (RFC 6386 §12.2).~~
+- ~~Pick the mode that minimises sum-of-absolute-differences (SAD) between the
+  predicted and source block.~~
 
-- Implement all ten 4×4 luma sub-modes: B_DC_PRED, B_TM_PRED, B_VE_PRED,
+**Implemented in `prediction.go`**: `Predict16x16()`, `Predict8x8Chroma()`, 
+`SelectBest16x16Mode()`, `SelectBest8x8ChromaMode()` with SAD-based mode selection.
+
+### 1.3 4×4 intra prediction sub-modes (B_PRED) ✅
+
+- ~~Implement all ten 4×4 luma sub-modes: B_DC_PRED, B_TM_PRED, B_VE_PRED,
   B_HE_PRED, B_LD_PRED, B_RD_PRED, B_VR_PRED, B_VL_PRED, B_HD_PRED, B_HU_PRED
-  (RFC 6386 §12.3).
-- Signal B_PRED at the macroblock level and encode the chosen sub-mode for each
-  of the 16 luma 4×4 blocks via the `bmode` probability tree (RFC 6386 §11.2).
+  (RFC 6386 §12.3).~~
+- ~~Signal B_PRED at the macroblock level and encode the chosen sub-mode for each
+  of the 16 luma 4×4 blocks via the `bmode` probability tree (RFC 6386 §11.2).~~
 
-### 1.4 Forward DCT and quantization
+**Implemented in `bpred.go`**: All 10 B_PRED sub-modes with `Predict4x4()` and
+`SelectBest4x4Mode()` functions. Mode signaling will be added when residual coding is complete.
 
-- Implement the VP8 integer 4×4 forward DCT (RFC 6386 §14.1) for residuals of
-  luma 4×4 blocks.
-- Implement the 4×4 WHT (Walsh-Hadamard Transform) used for the Y2 (DC-of-DC)
-  plane (RFC 6386 §14.3).
-- Apply per-plane quantization using the step sizes from §1.1 above.
+### 1.4 Forward DCT and quantization ✅
 
-### 1.5 Residual token entropy coding
+- ~~Implement the VP8 integer 4×4 forward DCT (RFC 6386 §14.1) for residuals of
+  luma 4×4 blocks.~~
+- ~~Implement the 4×4 WHT (Walsh-Hadamard Transform) used for the Y2 (DC-of-DC)
+  plane (RFC 6386 §14.3).~~
+- ~~Apply per-plane quantization using the step sizes from §1.1 above.~~
 
-- Implement the coefficient probability tables (RFC 6386 §13.4, default tables
-  in Annexe B).
-- Implement the token tree and value coding path for DCT coefficients
-  (RFC 6386 §13.2–13.3): ZERO_TOKEN, ONE_TOKEN, TWO_TOKEN … DCT_VAL_CAT6.
-- Emit coefficient tokens into the second (residual) partition for non-skip
-  macroblocks.
-- Update `macroblock.skip` based on whether all quantized coefficients are zero,
-  and set `coeff_skip` accordingly in the first-partition MB header.
+**Implemented in `dct.go`**: `ForwardDCT4x4()` and `InverseDCT4x4()` based on
+libvpx reference (vp8_short_fdct4x4_c, vp8_short_idct4x4llm_c), 
+`ForwardWHT4x4()` and `InverseWHT4x4()` for Y2 block, `QuantizeBlock()` and
+`DequantizeBlock()` functions, plus zigzag ordering utilities.
 
-### 1.6 Entropy probability update
+### 1.5 Residual token entropy coding ✅
 
-- Implement serialisation of coefficient probability table updates
+- ~~Implement the coefficient probability tables (RFC 6386 §13.4, default tables
+  in Annexe B).~~
+- ~~Implement the token tree and value coding path for DCT coefficients
+  (RFC 6386 §13.2–13.3): ZERO_TOKEN, ONE_TOKEN, TWO_TOKEN … DCT_VAL_CAT6.~~
+- ~~Emit coefficient tokens into the second (residual) partition for non-skip
+  macroblocks.~~
+- ~~Update `macroblock.skip` based on whether all quantized coefficients are zero,
+  and set `coeff_skip` accordingly in the first-partition MB header.~~
+
+**Implemented in `token.go`**: `DefaultCoeffProbs` tables, `TokenEncoder` with
+`EncodeToken()`, `EncodeBlock()`, `EncodeEOB()` and category extra bits encoding.
+Block types (Y_DC, Y_AC, UV_DC, UV_AC), coefficient bands, and context tracking.
+
+### 1.6 Entropy probability update ✅
+
+- ~~Implement serialisation of coefficient probability table updates
   (RFC 6386 §13.4, `coeff_prob_update_flag`) so the encoder can communicate
-  adapted probabilities to the decoder.
+  adapted probabilities to the decoder.~~
 
-### 1.7 Multiple DCT partitions
+**Implemented in `token.go`**: `CoeffProbUpdateProbs` table for update flag
+probabilities, `EncodeCoeffProbUpdates()` and `EncodeNoCoeffProbUpdates()`
+functions, plus `CopyCoeffProbs()` helper.
 
-- Support encoding residuals into 1, 2, 4, or 8 independent second-partition
-  segments as signalled by `token_partition` (RFC 6386 §9.5).
-- Write the per-partition size bytes between the first partition and the
-  residual partitions (RFC 6386 §9.7).
+### 1.7 Multiple DCT partitions ✅
+
+- ~~Support encoding residuals into 1, 2, 4, or 8 independent second-partition
+  segments as signalled by `token_partition` (RFC 6386 §9.5).~~
+- ~~Write the per-partition size bytes between the first partition and the
+  residual partitions (RFC 6386 §9.7).~~
+
+**Implemented in `partition.go`**: `PartitionCount` type, `PartitionWriter`
+for managing multiple encoders, `BuildPartitionSizes()` for 3-byte LE sizes,
+`AssembleMultiPartitionFrame()` for frame assembly, and row-based distribution.
 
 ---
 
