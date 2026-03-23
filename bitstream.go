@@ -222,22 +222,22 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 	// Track non-zero status for context calculation
 	// The decoder uses left + above neighbors to compute context (0, 1, or 2)
-	
+
 	// For Y2: track nzY16 per MB
 	// nzY16[mbx] = 1 if MB at column mbx had non-zero Y2 coefficients
 	leftNzY16 := uint8(0)
 	upNzY16 := make([]uint8, mbW)
-	
+
 	// For Y1: track nzMask (4 bits for bottom row of 4x4 blocks)
 	// leftNzMaskY = 4 bits for right column of left MB's Y blocks
 	// upNzMaskY[mbx] = 4 bits for bottom row of above MB's Y blocks
 	leftNzMaskY := uint8(0)
 	upNzMaskY := make([]uint8, mbW)
-	
+
 	// For UV: similar tracking
 	leftNzMaskUV := uint8(0)
 	upNzMaskUV := make([]uint8, mbW)
-	
+
 	mbY := 0
 	for mbIdx, mb := range mbs {
 		mbX := mbIdx % mbW
@@ -247,7 +247,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 			leftNzMaskY = 0
 			leftNzMaskUV = 0
 		}
-		
+
 		if mb.skip {
 			// Skip MB: update context tracking to 0 for this position
 			leftNzY16 = 0
@@ -284,7 +284,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 			yPlane = PlaneY1SansY2
 			firstYCoeff = 0
 		}
-		
+
 		// Track Y block non-zero for context
 		// lnz[0..3] = left column non-zero (from previous MB or 0)
 		// unz[0..3] = above row non-zero (from above MB or 0)
@@ -293,7 +293,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 			lnz[i] = (leftNzMaskY >> i) & 1
 			unz[i] = (upNzMaskY[mbX] >> i) & 1
 		}
-		
+
 		var newLeftNzMaskY, newUpNzMaskY uint8
 		for blockY := 0; blockY < 4; blockY++ {
 			nz := lnz[blockY]
@@ -329,7 +329,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 		lnzUV[1] = (leftNzMaskUV >> 1) & 1
 		unzUV[0] = (upNzMaskUV[mbX] >> 0) & 1
 		unzUV[1] = (upNzMaskUV[mbX] >> 1) & 1
-		
+
 		var newLeftNzMaskU, newUpNzMaskU uint8
 		for blockY := 0; blockY < 2; blockY++ {
 			nz := lnzUV[blockY]
@@ -360,7 +360,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 		lnzUV[1] = (leftNzMaskUV >> 3) & 1
 		unzUV[0] = (upNzMaskUV[mbX] >> 2) & 1
 		unzUV[1] = (upNzMaskUV[mbX] >> 3) & 1
-		
+
 		var newLeftNzMaskV, newUpNzMaskV uint8
 		for blockY := 0; blockY < 2; blockY++ {
 			nz := lnzUV[blockY]
@@ -384,7 +384,7 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 		for i := 0; i < 2; i++ {
 			newUpNzMaskV |= unzUV[i] << i
 		}
-		
+
 		// Combine U and V masks
 		leftNzMaskUV = newLeftNzMaskU | (newLeftNzMaskV << 2)
 		upNzMaskUV[mbX] = newUpNzMaskU | (newUpNzMaskV << 2)
