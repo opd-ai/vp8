@@ -348,41 +348,43 @@ func (te *TokenEncoder) encodeCoeffValue(probs *[11]uint8, value int16) int {
 	return token
 }
 
-// encodeValueTree encodes values >= 2 using the tree structure.
-// This matches the decoder's tree in x/image/vp8 parseResiduals4:
+// encodeValueTree encodes values >= 2 using the VP8 coefficient token tree.
+// Reference: RFC 6386 Section 13.2
 //
-//	p[3]: 2/3/4 vs cat1+ (values 5+)
-//	  false: 2/3/4
-//	    p[4]: 2 vs 3/4
-//	      false: 2
-//	      true: 3 or 4
-//	        p[5]: extra bit for 3 vs 4
-//	  true: cat1+ (values 5+)
+// Tree structure (after p[1]=non-zero, p[2]=more-than-one):
+// The tree at this point is: {8, 12} (go to 8 for 2-4, go to 12 for cats)
+//
+//	p[3]: 2/3/4 vs cats (branch at index 6)
+//	  false -> node 8: p[4]: 2 vs 3-4
+//	    false -> DCT_2
+//	    true -> p[5]: 3 vs 4
+//	  true -> node 12: cats
 //	    p[6]: cat1/cat2 vs cat3+
-//	      false: cat1 or cat2
-//	        p[7]: cat1 vs cat2
-//	      true: cat3/4/5/6
-//	        p[8]: cat3/4 vs cat5/6
-//	        p[9] or p[10]: specific category
+//	      false -> p[7]: cat1 vs cat2
+//	      true -> p[8]: cat3/4 vs cat5/6
+//	        false -> p[9]: cat3 vs cat4
+//	        true -> p[10]: cat5 vs cat6
 func (te *TokenEncoder) encodeValueTree(probs *[11]uint8, token, absVal int) {
-	// p[3]: 2/3/4 vs cat1+
+	// p[3]: 2/3/4 vs cats
 	if token <= DCT_4 {
-		te.boolEnc.putBit(probs[3], false)
-		// p[4]: 2 vs 3/4
+		// 2, 3, or 4
+		te.boolEnc.putBit(probs[3], false) // go to node 8
+
+		// p[4]: 2 vs 3-4
 		if token == DCT_2 {
 			te.boolEnc.putBit(probs[4], false)
 		} else {
 			te.boolEnc.putBit(probs[4], true)
-			// p[5]: 3 vs 4 (extra bit, 0=3, 1=4)
+			// p[5]: 3 vs 4
 			te.boolEnc.putBit(probs[5], token == DCT_4)
 		}
 		return
 	}
-	te.boolEnc.putBit(probs[3], true) // cat1+
+	te.boolEnc.putBit(probs[3], true) // go to node 12 (cats)
 
 	// p[6]: cat1/cat2 vs cat3+
 	if token <= DCT_CAT2 {
-		te.boolEnc.putBit(probs[6], false)
+		te.boolEnc.putBit(probs[6], false) // cat1 or cat2
 		// p[7]: cat1 vs cat2
 		if token == DCT_CAT1 {
 			te.boolEnc.putBit(probs[7], false)
@@ -397,7 +399,7 @@ func (te *TokenEncoder) encodeValueTree(probs *[11]uint8, token, absVal int) {
 
 	// p[8]: cat3/4 vs cat5/6
 	if token <= DCT_CAT4 {
-		te.boolEnc.putBit(probs[8], false)
+		te.boolEnc.putBit(probs[8], false) // cat3 or cat4
 		// p[9]: cat3 vs cat4
 		if token == DCT_CAT3 {
 			te.boolEnc.putBit(probs[9], false)
