@@ -590,6 +590,13 @@ func (te *TokenEncoder) EncodeEOB(blockType, coeffIdx, context int) {
 // 2. For each coefficient position: read p[1] for is-zero, then value bits if non-zero
 // 3. After each coefficient except the last: read p[0] for continue/EOB
 func (te *TokenEncoder) EncodeBlock(coeffs [16]int16, blockType, firstCoeff int) bool {
+	return te.EncodeBlockWithContext(coeffs, blockType, firstCoeff, 0)
+}
+
+// EncodeBlockWithContext encodes a 4x4 block of coefficients with a specified initial context.
+// The context is derived from neighboring blocks' non-zero status (0, 1, or 2).
+// Returns true if the block had at least one non-zero coefficient.
+func (te *TokenEncoder) EncodeBlockWithContext(coeffs [16]int16, blockType, firstCoeff, initialContext int) bool {
 	// Find the last non-zero coefficient
 	lastNonZero := -1
 	for i := 15; i >= firstCoeff; i-- {
@@ -601,18 +608,18 @@ func (te *TokenEncoder) EncodeBlock(coeffs [16]int16, blockType, firstCoeff int)
 
 	// If all coefficients are zero, encode EOB at first position
 	if lastNonZero < firstCoeff {
-		te.EncodeEOB(blockType, firstCoeff, 0) // context 0 for first
+		te.EncodeEOB(blockType, firstCoeff, initialContext)
 		return false
 	}
 
 	// First coefficient position: write p[0]=true (has coefficients)
 	band := coeffBand[firstCoeff]
-	probs := &te.coeffProbs[blockType][band][0] // context 0 for first
-	te.boolEnc.putBit(probs[0], true)           // not EOB, has coefficients
+	probs := &te.coeffProbs[blockType][band][initialContext]
+	te.boolEnc.putBit(probs[0], true) // not EOB, has coefficients
 
 	// Encode all coefficients from firstCoeff to lastNonZero
 	// The decoder reads p[0] only after non-zero coefficients (not after zeros).
-	context := 0
+	context := initialContext
 	for i := firstCoeff; i <= lastNonZero; i++ {
 		band = coeffBand[i]
 		probs = &te.coeffProbs[blockType][band][context]

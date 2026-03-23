@@ -171,6 +171,8 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 		return nil, errInvalidDimensions
 	}
 
+	mbW := (width + 15) / 16
+
 	// Encode first partition (frame header + MB modes).
 	partEnc := newBoolEncoder()
 	encodeFrameHeader(partEnc, width, height, qi, len(mbs), mbs)
@@ -180,7 +182,7 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 	residualEnc := newBoolEncoder()
 	coeffProbs := DefaultCoeffProbs
 	tokenEnc := NewTokenEncoder(residualEnc, &coeffProbs)
-	encodeResidualPartition(tokenEnc, mbs)
+	encodeResidualPartition(tokenEnc, mbs, mbW)
 	secondPart := residualEnc.flush()
 
 	firstPartSize := len(firstPart)
@@ -217,17 +219,60 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 
 // encodeResidualPartition encodes DCT coefficients for all non-skip macroblocks.
 // Reference: RFC 6386 §13
-func encodeResidualPartition(te *TokenEncoder, mbs []macroblock) {
-	for _, mb := range mbs {
+func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
+	// Track non-zero status for context calculation
+	// The decoder uses left + above neighbors to compute context (0, 1, or 2)
+	
+	// For Y2: track nzY16 per MB
+	// nzY16[mbx] = 1 if MB at column mbx had non-zero Y2 coefficients
+	leftNzY16 := uint8(0)
+	upNzY16 := make([]uint8, mbW)
+	
+	// For Y1: track nzMask (4 bits for bottom row of 4x4 blocks)
+	// leftNzMaskY = 4 bits for right column of left MB's Y blocks
+	// upNzMaskY[mbx] = 4 bits for bottom row of above MB's Y blocks
+	leftNzMaskY := uint8(0)
+	upNzMaskY := make([]uint8, mbW)
+	
+	// For UV: similar tracking
+	leftNzMaskUV := uint8(0)
+	upNzMaskUV := make([]uint8, mbW)
+	
+	mbY := 0
+	for mbIdx, mb := range mbs {
+		mbX := mbIdx % mbW
+		if mbX == 0 && mbIdx > 0 {
+			mbY++
+			leftNzY16 = 0
+			leftNzMaskY = 0
+			leftNzMaskUV = 0
+		}
+		
 		if mb.skip {
+			// Skip MB: update context tracking to 0 for this position
+			leftNzY16 = 0
+			upNzY16[mbX] = 0
+			leftNzMaskY = 0
+			upNzMaskY[mbX] = 0
+			leftNzMaskUV = 0
+			upNzMaskUV[mbX] = 0
 			continue
 		}
 
 		// For 16x16 modes (not B_PRED), encode Y2 block first (DC-of-DCs)
 		if mb.lumaMode != B_PRED {
-			// Y2 block: DC values of all 16 Y blocks, transformed with WHT
-			// Uses plane 1 (PlaneY2)
-			te.EncodeBlock(mb.y2Coeffs, PlaneY2, 0)
+			// Y2 context = left + above (clamped to 2)
+			y2Context := int(leftNzY16 + upNzY16[mbX])
+			if y2Context > 2 {
+				y2Context = 2
+			}
+			nz := te.EncodeBlockWithContext(mb.y2Coeffs, PlaneY2, 0, y2Context)
+			nzVal := uint8(0)
+			if nz {
+				nzVal = 1
+			}
+			leftNzY16 = nzVal
+			upNzY16[mbX] = nzVal
 		}
 
 		// Encode 16 Y blocks (4x4 each)
@@ -239,18 +284,109 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock) {
 			yPlane = PlaneY1SansY2
 			firstYCoeff = 0
 		}
-		for i := 0; i < 16; i++ {
-			te.EncodeBlock(mb.yCoeffs[i], yPlane, firstYCoeff)
+		
+		// Track Y block non-zero for context
+		// lnz[0..3] = left column non-zero (from previous MB or 0)
+		// unz[0..3] = above row non-zero (from above MB or 0)
+		var lnz, unz [4]uint8
+		for i := 0; i < 4; i++ {
+			lnz[i] = (leftNzMaskY >> i) & 1
+			unz[i] = (upNzMaskY[mbX] >> i) & 1
 		}
+		
+		var newLeftNzMaskY, newUpNzMaskY uint8
+		for blockY := 0; blockY < 4; blockY++ {
+			nz := lnz[blockY]
+			for blockX := 0; blockX < 4; blockX++ {
+				blockIdx := blockY*4 + blockX
+				ctx := int(nz + unz[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.yCoeffs[blockIdx], yPlane, firstYCoeff, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unz[blockX] = nzVal
+			}
+			lnz[blockY] = nz
+			// Record right column for next MB's left context
+			newLeftNzMaskY |= nz << blockY
+		}
+		// Record bottom row for next row's above context
+		for i := 0; i < 4; i++ {
+			newUpNzMaskY |= unz[i] << i
+		}
+		leftNzMaskY = newLeftNzMaskY
+		upNzMaskY[mbX] = newUpNzMaskY
 
 		// Encode 4 U blocks (plane 2 = PlaneUV)
-		for i := 0; i < 4; i++ {
-			te.EncodeBlock(mb.uCoeffs[i], PlaneUV, 0)
+		// UV blocks are 2x2 per MB
+		var lnzUV, unzUV [2]uint8
+		lnzUV[0] = (leftNzMaskUV >> 0) & 1
+		lnzUV[1] = (leftNzMaskUV >> 1) & 1
+		unzUV[0] = (upNzMaskUV[mbX] >> 0) & 1
+		unzUV[1] = (upNzMaskUV[mbX] >> 1) & 1
+		
+		var newLeftNzMaskU, newUpNzMaskU uint8
+		for blockY := 0; blockY < 2; blockY++ {
+			nz := lnzUV[blockY]
+			for blockX := 0; blockX < 2; blockX++ {
+				blockIdx := blockY*2 + blockX
+				ctx := int(nz + unzUV[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.uCoeffs[blockIdx], PlaneUV, 0, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unzUV[blockX] = nzVal
+			}
+			lnzUV[blockY] = nz
+			newLeftNzMaskU |= nz << blockY
+		}
+		for i := 0; i < 2; i++ {
+			newUpNzMaskU |= unzUV[i] << i
 		}
 
 		// Encode 4 V blocks (plane 2 = PlaneUV)
-		for i := 0; i < 4; i++ {
-			te.EncodeBlock(mb.vCoeffs[i], PlaneUV, 0)
+		// Reset UV context for V (uses same left/above tracking)
+		lnzUV[0] = (leftNzMaskUV >> 2) & 1
+		lnzUV[1] = (leftNzMaskUV >> 3) & 1
+		unzUV[0] = (upNzMaskUV[mbX] >> 2) & 1
+		unzUV[1] = (upNzMaskUV[mbX] >> 3) & 1
+		
+		var newLeftNzMaskV, newUpNzMaskV uint8
+		for blockY := 0; blockY < 2; blockY++ {
+			nz := lnzUV[blockY]
+			for blockX := 0; blockX < 2; blockX++ {
+				blockIdx := blockY*2 + blockX
+				ctx := int(nz + unzUV[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.vCoeffs[blockIdx], PlaneUV, 0, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unzUV[blockX] = nzVal
+			}
+			lnzUV[blockY] = nz
+			newLeftNzMaskV |= nz << blockY
 		}
+		for i := 0; i < 2; i++ {
+			newUpNzMaskV |= unzUV[i] << i
+		}
+		
+		// Combine U and V masks
+		leftNzMaskUV = newLeftNzMaskU | (newLeftNzMaskV << 2)
+		upNzMaskUV[mbX] = newUpNzMaskU | (newUpNzMaskV << 2)
 	}
 }

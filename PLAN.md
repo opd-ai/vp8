@@ -101,7 +101,7 @@
 - **Acceptance**: Black frame and white frame produce different encoded sizes; gradient frame produces larger output than solid color
 - **Validation**: `go test -v -run TestEncodeVariation`
 
-### Step 7: Add WebRTC decode verification test
+### Step 7: Add WebRTC decode verification test ✅
 - **Deliverable**: Add integration test in `encoder_test.go` that:
   1. Encodes a test pattern (gradient, checkerboard)
   2. Decodes with `golang.org/x/image/vp8`
@@ -111,6 +111,7 @@
 - **Goal Impact**: Validates ROADMAP claim of WebRTC compatibility; closes GAPS.md Gap 7
 - **Acceptance**: Test passes; decoded image is visually recognizable
 - **Validation**: `go test -v -run TestDecodeVerification`
+- **Implementation Notes**: Fixed coefficient context tracking in residual partition encoding. The encoder now properly tracks left/above neighbor non-zero status when encoding blocks, matching the decoder's context-adaptive probability selection.
 
 ### Step 8: Remove deprecated function predictDC ✅
 - **Deliverable**: Delete `predictDC()` function from `prediction.go` (lines 304-326)
