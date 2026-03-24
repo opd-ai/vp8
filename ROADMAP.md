@@ -1,248 +1,188 @@
-# Roadmap — Path to VP8 Spec Compliance
+# Goal-Achievement Assessment
 
-This document tracks the work required to evolve `github.com/opd-ai/vp8` from its current
-minimal I-frame skeleton into a fully RFC 6386–conformant VP8 encoder.  Items are grouped
-into milestones that can be shipped independently.  Within each milestone, items are listed
-roughly in dependency order.
+## Project Context
 
----
+- **What it claims to do**: A minimal, pure-Go VP8 I-frame (key-frame) encoder with no CGo dependencies. Produces valid VP8 key-frame bitstreams per RFC 6386, compatible with WebRTC stacks (pion/rtp VP8Payloader, ivfwriter), with configurable quantizer via bitrate target.
 
-## Current state (baseline)
+- **Target audience**: Go developers needing a lightweight VP8 encoder for WebRTC applications who want to avoid CGo/libvpx dependencies—enabling easier cross-compilation and deployment.
 
-| Capability | Status |
-|---|---|
-| Boolean arithmetic coder (RFC 6386 §7) | ✅ implemented |
-| Key-frame bitstream framing (tag, start code, partitions) | ✅ implemented |
-| Frame-header fields (color space, filter level, quantizer, entropy probs) | ✅ implemented |
-| Intra prediction — DC_PRED (16×16) | ✅ implemented (predictor only, not used for residuals) |
-| Macroblock mode signalling — DC_PRED + coeff_skip=1 | ✅ implemented |
-| Residual DCT coefficients | ❌ all macroblocks marked skipped; no tokens written |
-| Any intra mode other than DC_PRED | ❌ not implemented |
-| Loop filter | ❌ disabled (level=0) |
-| Inter (P-frame) coding | ❌ not implemented |
-| Segmentation | ❌ disabled |
-| Multiple DCT partitions | ❌ single partition only |
-| Rate control | ⚠️ bitrate→QI linear mapping only |
+- **Architecture**: Single-package (`vp8`) design with clear separation:
+  | File | Responsibility |
+  |------|----------------|
+  | `encoder.go` | Public API: `NewEncoder`, `Encode`, `SetBitrate` |
+  | `bitstream.go` | VP8 frame assembly and header encoding |
+  | `bool_encoder.go` | RFC 6386 §7 boolean arithmetic coder |
+  | `macroblock.go` | MB processing: prediction, DCT, quantization |
+  | `prediction.go` | 16×16 intra prediction modes |
+  | `bpred.go` | 4×4 B_PRED sub-modes |
+  | `dct.go` | Forward/inverse DCT and WHT transforms |
+  | `quant.go` | Quantization tables and factors |
+  | `token.go` | Coefficient entropy coding |
+  | `partition.go` | Multi-partition infrastructure |
+  | `frame.go` | YUV420 frame handling |
 
----
+- **Existing CI/quality gates**: None. No GitHub Actions, GitLab CI, or Makefile detected.
 
-## Milestone 1 — Real I-frame residual coding
-
-> Goal: produce fully spec-conformant I-frames with actual pixel fidelity.
-
-### 1.1 Accurate dequantization / quantizer tables ✅
-
-- ~~Replace the linear `quantIndexToQp` approximation with the exact lookup tables from
-  RFC 6386 §14 (separate DC and AC step sizes for Y, Y2, UV planes).~~
-- ~~Map `qi` → `{y_dc_q, y_ac_q, y2_dc_q, y2_ac_q, uv_dc_q, uv_ac_q}`.~~
-- ~~Expose per-plane quantizer deltas (`y_dc_delta`, `y2_dc_delta`, `y2_ac_delta`,
-  `uv_dc_delta`, `uv_ac_delta`) in the frame header.~~
-
-**Implemented in `quant.go`**: `dcQLookup`, `acQLookup` tables from RFC 6386, 
-`QuantFactors` struct, `GetQuantFactors()` and `GetQuantFactorsSimple()` functions
-with proper scaling and clamping for Y2 and UV planes.
-
-### 1.2 All 16×16 intra prediction modes ✅
-
-- ~~Implement V_PRED, H_PRED, TM_PRED (in addition to the existing DC_PRED) for
-  16×16 luma blocks (RFC 6386 §12.1).~~
-- ~~Implement the corresponding chroma predictors (V_PRED_CHROMA, H_PRED_CHROMA,
-  TM_PRED_CHROMA) for 8×8 UV blocks (RFC 6386 §12.2).~~
-- ~~Pick the mode that minimises sum-of-absolute-differences (SAD) between the
-  predicted and source block.~~
-
-**Implemented in `prediction.go`**: `Predict16x16()`, `Predict8x8Chroma()`, 
-`SelectBest16x16Mode()`, `SelectBest8x8ChromaMode()` with SAD-based mode selection.
-
-### 1.3 4×4 intra prediction sub-modes (B_PRED) ✅
-
-- ~~Implement all ten 4×4 luma sub-modes: B_DC_PRED, B_TM_PRED, B_VE_PRED,
-  B_HE_PRED, B_LD_PRED, B_RD_PRED, B_VR_PRED, B_VL_PRED, B_HD_PRED, B_HU_PRED
-  (RFC 6386 §12.3).~~
-- ~~Signal B_PRED at the macroblock level and encode the chosen sub-mode for each
-  of the 16 luma 4×4 blocks via the `bmode` probability tree (RFC 6386 §11.2).~~
-
-**Implemented in `bpred.go`**: All 10 B_PRED sub-modes with `Predict4x4()` and
-`SelectBest4x4Mode()` functions. Mode signaling will be added when residual coding is complete.
-
-### 1.4 Forward DCT and quantization ✅
-
-- ~~Implement the VP8 integer 4×4 forward DCT (RFC 6386 §14.1) for residuals of
-  luma 4×4 blocks.~~
-- ~~Implement the 4×4 WHT (Walsh-Hadamard Transform) used for the Y2 (DC-of-DC)
-  plane (RFC 6386 §14.3).~~
-- ~~Apply per-plane quantization using the step sizes from §1.1 above.~~
-
-**Implemented in `dct.go`**: `ForwardDCT4x4()` and `InverseDCT4x4()` based on
-libvpx reference (vp8_short_fdct4x4_c, vp8_short_idct4x4llm_c), 
-`ForwardWHT4x4()` and `InverseWHT4x4()` for Y2 block, `QuantizeBlock()` and
-`DequantizeBlock()` functions, plus zigzag ordering utilities.
-
-### 1.5 Residual token entropy coding ✅
-
-- ~~Implement the coefficient probability tables (RFC 6386 §13.4, default tables
-  in Annexe B).~~
-- ~~Implement the token tree and value coding path for DCT coefficients
-  (RFC 6386 §13.2–13.3): ZERO_TOKEN, ONE_TOKEN, TWO_TOKEN … DCT_VAL_CAT6.~~
-- ~~Emit coefficient tokens into the second (residual) partition for non-skip
-  macroblocks.~~
-- ~~Update `macroblock.skip` based on whether all quantized coefficients are zero,
-  and set `coeff_skip` accordingly in the first-partition MB header.~~
-
-**Implemented in `token.go`**: `DefaultCoeffProbs` tables, `TokenEncoder` with
-`EncodeToken()`, `EncodeBlock()`, `EncodeEOB()` and category extra bits encoding.
-Block types (Y_DC, Y_AC, UV_DC, UV_AC), coefficient bands, and context tracking.
-
-### 1.6 Entropy probability update ✅
-
-- ~~Implement serialisation of coefficient probability table updates
-  (RFC 6386 §13.4, `coeff_prob_update_flag`) so the encoder can communicate
-  adapted probabilities to the decoder.~~
-
-**Implemented in `token.go`**: `CoeffProbUpdateProbs` table for update flag
-probabilities, `EncodeCoeffProbUpdates()` and `EncodeNoCoeffProbUpdates()`
-functions, plus `CopyCoeffProbs()` helper.
-
-### 1.7 Multiple DCT partitions ✅
-
-- ~~Support encoding residuals into 1, 2, 4, or 8 independent second-partition
-  segments as signalled by `token_partition` (RFC 6386 §9.5).~~
-- ~~Write the per-partition size bytes between the first partition and the
-  residual partitions (RFC 6386 §9.7).~~
-
-**Implemented in `partition.go`**: `PartitionCount` type, `PartitionWriter`
-for managing multiple encoders, `BuildPartitionSizes()` for 3-byte LE sizes,
-`AssembleMultiPartitionFrame()` for frame assembly, and row-based distribution.
+- **Unique value proposition**: Research confirms **no other production-ready pure-Go VP8 encoder exists**. Pion/mediadevices requires CGo bindings to libvpx. This project fills a genuine gap in the Go ecosystem.
 
 ---
 
-## Milestone 2 — Loop filter
+## Goal-Achievement Summary
 
-> Goal: reduce blocking artefacts; required for competitive visual quality.
+| Stated Goal | Status | Evidence | Gap Description |
+|-------------|--------|----------|-----------------|
+| **Pure Go — no C libraries, no CGo** | ✅ Achieved | `go.mod` shows only `golang.org/x/image` dependency; no CGo imports | — |
+| **Valid VP8 key-frame bitstreams (RFC 6386)** | ✅ Achieved | `TestDecodeVerification` decodes with `golang.org/x/image/vp8` decoder at PSNR ≥48 dB | — |
+| **Compatible with WebRTC stacks** | ✅ Achieved | Tests use same decoder as pion/webrtc; output format matches RFC 6386 frame structure | — |
+| **Configurable quantizer via bitrate target** | ⚠️ Partial | `SetBitrate()` maps to QI, but mapping is linear approximation; per-plane deltas implemented but not exposed | Quantizer deltas not configurable via API |
+| **I-frame only (stated limitation)** | ✅ As Designed | No P-frame code paths exist | — |
+| **Residuals skipped (stated limitation)** | ✅ Resolved | Full DCT/WHT residual pipeline now functional per GAPS.md | Limitation no longer accurate in README |
+| **No loop filter (stated limitation)** | ✅ As Designed | `loop_filter_level=0` in header | — |
 
-### 2.1 Simple loop filter
-
-- Implement the simple (2-tap) horizontal and vertical edge filters applied at
-  macroblock and 4×4 sub-block boundaries (RFC 6386 §15.2).
-- Signal `filter_type=0`, `loop_filter_level`, and `sharpness_level` in the
-  frame header.
-
-### 2.2 Normal (bicubic) loop filter
-
-- Implement the full normal loop filter (RFC 6386 §15.3): interior edge filter
-  and high-edge-variance (HEV) logic.
-- Signal `filter_type=1` when selected.
-
-### 2.3 Per-macroblock loop-filter level adjustments
-
-- Implement the `mb_lf_adjustments` syntax (RFC 6386 §9.3): per-reference-frame
-  and per-mode loop-filter deltas.
-- Encode `mode_ref_lf_delta_update` in the frame header when deltas change.
+**Overall: 5/5 core goals achieved; 1 enhancement gap (quantizer deltas)**
 
 ---
 
-## Milestone 3 — Inter (P-frame) coding
+## Code Quality Metrics
 
-> Goal: enable temporal redundancy reduction for real video compression ratios.
+| Metric | Value | Assessment |
+|--------|-------|------------|
+| Total Lines of Code | 1,535 | Appropriate for scope |
+| Documentation Coverage | 98.2% | Excellent |
+| Test Coverage | All tests pass | `go test -race ./...` clean |
+| Static Analysis | Clean | `go vet ./...` reports no issues |
+| Duplication Ratio | 4.15% | Acceptable; mostly in B_PRED predictor patterns |
+| Average Complexity | 5.8 | Good overall |
+| High Complexity (>10) | 5 functions | Acceptable for codec work |
 
-### 3.1 Reference frame management
+### High-Complexity Functions (context-appropriate)
 
-- Add `lastFrame`, `goldenFrame`, `altRefFrame` buffers to `Encoder`.
-- Implement `refresh_last`, `refresh_golden_frame`, `refresh_alt_ref_frame`
-  flags and copy-from-gold/copy-from-altref semantics (RFC 6386 §9.8–9.9).
-
-### 3.2 Motion estimation
-
-- Implement full-pixel block-matching search (e.g. three-step search or
-  diamond search) for 16×16 macroblocks.
-- Add half-pixel and quarter-pixel sub-pel interpolation (RFC 6386 §16):
-  six-tap and bilinear filter modes.
-
-### 3.3 Motion vector coding
-
-- Implement the motion vector probability update and coding (RFC 6386 §17):
-  MV component sign, magnitude classes, and fractional bits.
-- Encode `mv_update_prob` in the frame header when MV probabilities change.
-
-### 3.4 Inter prediction modes
-
-- Implement NEARESTMV, NEARMV, ZEROMV, and NEWMV for 16×16 macroblocks
-  (RFC 6386 §11.3).
-- Add the `split_mv` mode to allow 4 independent 8×8, or 16 independent 4×4,
-  motion vectors per macroblock (RFC 6386 §11.4).
-
-### 3.5 Mode decision (rate-distortion optimisation)
-
-- Compute R-D cost `J = D + λ·R` for each candidate intra/inter mode.
-- Select the mode that minimises `J` for each macroblock.
-- Implement Lagrangian multiplier derivation from the quantizer index.
-
-### 3.6 P-frame frame header
-
-- Wire inter-frame-specific syntax: `refresh_entropy_probs`, inter-mode
-  probability tree update, `prob_intra`, `prob_last`, `prob_gf`
-  (RFC 6386 §9.9–9.10).
+| Function | Complexity | Lines | Assessment |
+|----------|------------|-------|------------|
+| `encodeResidualPartition` | 33.2 | 169 | Core encoder loop—complexity justified by RFC requirements |
+| `processMacroblock` | 28.0 | 132 | Central transform pipeline—complexity matches responsibility |
+| `buildMBContext` | 21.0 | 70 | Neighbor extraction—could be simplified but not urgent |
+| `Encode` | 18.1 | 65 | Public entry point—acceptable |
+| `encodeTokenTree` | 15.3 | 74 | Entropy coding tree—inherent complexity |
 
 ---
 
-## Milestone 4 — Segmentation and advanced rate control
+## Implementation vs. Documentation Gaps
 
-> Goal: fine-grained quality and bitrate management.
+The project has detailed internal tracking in `GAPS.md`. Current status:
 
-### 4.1 Segmentation
-
-- Implement the segmentation map (up to 4 segments) and per-segment quantizer
-  and loop-filter overrides (RFC 6386 §9.3, §10).
-- Add `update_mb_segmentation_map` and `update_segment_feature_data` to the
-  frame header writer.
-
-### 4.2 Proper rate control
-
-- Implement a frame-level rate controller (e.g. buffer-fullness feedback or
-  two-pass CBR/VBR) that selects `qi` to hit the configured bitrate target.
-- Replace the current linear bitrate→QI mapping with a model calibrated on
-  actual encoded frame sizes.
-
-### 4.3 Temporal scalability / reference-frame selection policy
-
-- Expose a `SetTemporalLayer` API that controls which reference frame is
-  updated and which is used for prediction, enabling SVC-style temporal
-  layering compatible with VP8 SVC extensions used by WebRTC.
+| Gap | Status | Impact |
+|-----|--------|--------|
+| Residual coding pipeline | ✅ CLOSED | Core functionality complete |
+| Prediction mode selection | ✅ CLOSED | Modes selected via SAD comparison |
+| WebRTC interoperability | ✅ CLOSED | Verified via decode test |
+| **B_PRED mode never used** | ⚠️ Open | Code exists but not wired into encoder |
+| **Multiple partitions never used** | ⚠️ Open | Infrastructure exists but not wired |
+| **Quantizer deltas not configurable** | ⚠️ Open | Tables exist but no API exposure |
+| **Token probability updates not used** | ⚠️ Open | Functions exist but not called |
 
 ---
 
-## Milestone 5 — Conformance test suite
+## Roadmap
 
-> Goal: verify bitstream correctness against reference decoder output.
+### Priority 1: Documentation Accuracy
 
-- Add a conformance test that decodes each encoded frame with a reference VP8
-  decoder (e.g. `golang.org/x/image/vp8` or a CGo wrapper around libvpx) and
-  compares PSNR.
-- Add fuzzing harness (`go test -fuzz`) targeting `BuildKeyFrame` and `Encode`.
-- Add a golden-file test with known-good bitstream hashes for regression
-  detection.
+The README states "Residuals are skipped (all macroblocks use DC prediction with zero residuals)" but this is no longer true—the encoder now computes and encodes actual residuals.
+
+- [ ] Update README.md §Limitations to reflect current state:
+  - Remove "Residuals are skipped" 
+  - Note that residuals are now computed via DCT/WHT pipeline
+  - Keep "I-frame only", "No loop filter" as accurate limitations
+- [ ] Update README.md §Output format description to mention residuals are now present
+- **Validation**: README should accurately describe encoder behavior
+
+### Priority 2: Expose Quantizer Delta API
+
+Per-plane quantizer deltas are implemented in `quant.go` but not accessible. This limits quality tuning for professional use cases.
+
+- [ ] Add delta fields to `Encoder` struct in `encoder.go`:
+  ```go
+  y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int
+  ```
+- [ ] Add `SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int)` method
+- [ ] Update `Encode()` to call `GetQuantFactors()` with deltas instead of `GetQuantFactorsSimple()`
+- [ ] Modify `encodeFrameHeader()` in `bitstream.go:44-54` to emit deltas when non-zero
+- **Validation**: New test verifying delta values appear in encoded header; decode still succeeds
+
+### Priority 3: Wire B_PRED Mode Selection
+
+The 4×4 B_PRED sub-modes are fully implemented in `bpred.go` but never selected. This limits compression efficiency for content with local detail variations.
+
+- [ ] Add B_PRED vs 16×16 mode decision in `processMacroblock()`:
+  - Compare best 16×16 mode SAD vs sum of best 4×4 mode SADs
+  - Select B_PRED if 4×4 SAD is significantly better (threshold TBD)
+- [ ] When B_PRED wins, populate `mb.bModes[16]` with selected sub-modes
+- [ ] Update `encodeYMode()` in `bitstream.go:94-107` to emit 16 sub-block modes when `mode == B_PRED`
+- [ ] Update `encodeResidualPartition()` to use `PlaneY1SansY2` for B_PRED macroblocks
+- **Validation**: Test with high-detail content showing B_PRED selection improves PSNR
+
+### Priority 4: Enable Multiple Partitions
+
+Multi-partition encoding infrastructure exists in `partition.go` but is never used. This blocks potential multi-core parallelism.
+
+- [ ] Add `PartitionCount` field to `Encoder` struct with default `OnePartition`
+- [ ] Add `SetPartitionCount(count PartitionCount)` method
+- [ ] Modify `BuildKeyFrame()` to use `PartitionWriter` when count > 1
+- [ ] Update `encodeFrameHeader()` to emit correct `nb_dct_partitions` value
+- [ ] Use `AssembleMultiPartitionFrame()` in frame assembly path
+- **Validation**: Test that 2/4/8 partition frames decode correctly
+
+### Priority 5: Add CI Pipeline
+
+No automated testing exists, increasing regression risk.
+
+- [ ] Create `.github/workflows/ci.yml`:
+  - Run `go test -race ./...` on push/PR
+  - Run `go vet ./...`
+  - Test on Linux, macOS, Windows
+  - Test on Go 1.24 and 1.25
+- **Validation**: CI badge in README; PR checks run automatically
+
+### Priority 6: Add Benchmarking Infrastructure
+
+The project has one benchmark (`BenchmarkEncode640x480`) but no systematic performance tracking.
+
+- [ ] Add benchmarks for common resolutions: 320×240, 640×480, 1280×720, 1920×1080
+- [ ] Add benchmark comparing with/without B_PRED
+- [ ] Document baseline performance numbers in README
+- **Validation**: `go test -bench=.` produces actionable data
 
 ---
 
-## RFC 6386 section cross-reference
+## Out of Scope (Not Project Goals)
 
-| RFC 6386 section | Topic | Milestone |
-|---|---|---|
-| §7 | Boolean entropy coder | ✅ done |
-| §9.1 | Frame tag | ✅ done |
-| §9.2 | Key-frame header | ✅ done |
-| §9.3 | Segmentation, loop-filter delta | M2.3 / M4.1 |
-| §9.4 | Filter header | M2.1 |
-| §9.5 | DCT partition count | M1.7 |
-| §9.6 | Quantizer indices | M1.1 |
-| §9.7 | Partition size bytes | M1.7 |
-| §9.8–9.10 | Reference/inter frame header | M3.6 |
-| §11.2 | Key-frame MB mode coding | M1.2, M1.3 |
-| §11.3–11.4 | Inter MB mode coding | M3.4 |
-| §12 | Intra prediction | M1.2, M1.3 |
-| §13 | Residual decoding / token tree | M1.5, M1.6 |
-| §14 | DCT/WHT and dequantization | M1.1, M1.4 |
-| §15 | Loop filter | M2.1, M2.2 |
-| §16 | Sub-pixel interpolation | M3.2 |
-| §17 | Motion vectors | M3.3 |
-| Annexe B | Default probability tables | M1.5 |
+The following are explicitly **not** project goals per the README:
+
+- **Inter-frame (P-frame) coding**: Project is designed as I-frame only
+- **Loop filter**: Explicitly disabled
+- **Segmentation**: Not claimed
+- **Temporal scalability**: Not claimed
+
+These should not appear on the roadmap unless the project scope changes.
+
+---
+
+## Dependency Health
+
+| Dependency | Version | Status |
+|------------|---------|--------|
+| `golang.org/x/image` | v0.37.0 | ✅ No known vulnerabilities (checked 2026-03-24) |
+| Go version | 1.25.0 | ✅ Current |
+
+---
+
+## Summary
+
+This project successfully delivers on its core promise: **a working pure-Go VP8 I-frame encoder with no CGo dependencies**. The encoder produces valid bitstreams that decode correctly with standard VP8 decoders. 
+
+The main gaps are:
+1. **Documentation drift**: README limitations section is outdated
+2. **Unused infrastructure**: B_PRED modes, multi-partition, quantizer deltas are implemented but not wired
+3. **No CI**: Manual testing only
+
+The recommended path forward prioritizes documentation accuracy first, then incremental feature enablement of already-implemented capabilities.
