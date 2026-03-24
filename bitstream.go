@@ -13,11 +13,46 @@ var (
 // vp8KeyFrameStartCode is the 3-byte marker that identifies a VP8 key frame.
 var vp8KeyFrameStartCode = [3]byte{0x9D, 0x01, 0x2A}
 
+// QuantDeltas holds the per-plane quantizer delta values for frame encoding.
+type QuantDeltas struct {
+	Y1DC int // Y1 DC coefficient delta
+	Y2DC int // Y2 DC coefficient delta
+	Y2AC int // Y2 AC coefficient delta
+	UVDC int // Chroma DC coefficient delta
+	UVAC int // Chroma AC coefficient delta
+}
+
+// encodeDelta encodes a quantizer delta value in the VP8 frame header.
+// If delta is 0, only a "not present" bit is written.
+// If delta is non-zero, a "present" bit is written, followed by the
+// magnitude (4 bits) and sign (1 bit).
+// Reference: RFC 6386 §9.6
+func encodeDelta(enc *boolEncoder, delta int) {
+	if delta == 0 {
+		enc.putBit(128, false) // delta_present = false
+		return
+	}
+	enc.putBit(128, true) // delta_present = true
+
+	// Encode magnitude (4 bits, unsigned)
+	magnitude := delta
+	if magnitude < 0 {
+		magnitude = -magnitude
+	}
+	if magnitude > 15 {
+		magnitude = 15 // clamp to 4-bit range
+	}
+	enc.putLiteral(uint32(magnitude), 4)
+
+	// Encode sign (1 bit): 0 = positive, 1 = negative
+	enc.putBit(128, delta < 0)
+}
+
 // encodeFrameHeader boolean-encodes the VP8 key-frame header into the
 // first partition. It encodes the minimum required fields so that a
 // conformant VP8 decoder can parse the bitstream.
 // Reference: RFC 6386, Section 9.2.
-func encodeFrameHeader(enc *boolEncoder, width, height, qi, numMBs int, mbs []macroblock) {
+func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas, partCount PartitionCount, numMBs int, mbs []macroblock) {
 	// color_space (1 bit): 0 = BT.601
 	enc.putBit(128, false)
 	// clamping_type (1 bit): 0 = clamped
@@ -36,22 +71,22 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi, numMBs int, mbs []ma
 	// mb_no_lf_delta (1 bit): 0
 	enc.putBit(128, false)
 
-	// nb_dct_partitions: 0 → 1 partition (2 bits)
-	enc.putLiteral(0, 2)
+	// nb_dct_partitions: log2(partition_count) (2 bits)
+	enc.putLiteral(uint32(partCount), 2)
 
 	// Quantizer indices (base + deltas).
 	// y_ac_qi (7 bits)
 	enc.putLiteral(uint32(qi), 7)
-	// y_dc_delta_present (1 bit): 0
-	enc.putBit(128, false)
-	// y2_dc_delta_present (1 bit): 0
-	enc.putBit(128, false)
-	// y2_ac_delta_present (1 bit): 0
-	enc.putBit(128, false)
-	// uv_dc_delta_present (1 bit): 0
-	enc.putBit(128, false)
-	// uv_ac_delta_present (1 bit): 0
-	enc.putBit(128, false)
+	// y1_dc_delta: present if non-zero
+	encodeDelta(enc, deltas.Y1DC)
+	// y2_dc_delta: present if non-zero
+	encodeDelta(enc, deltas.Y2DC)
+	// y2_ac_delta: present if non-zero
+	encodeDelta(enc, deltas.Y2AC)
+	// uv_dc_delta: present if non-zero
+	encodeDelta(enc, deltas.UVDC)
+	// uv_ac_delta: present if non-zero
+	encodeDelta(enc, deltas.UVAC)
 
 	// refresh_last_frame_buffer (1 bit): 0 (for keyframes, ignored by decoder)
 	// Note: For keyframes, this bit is read but ignored (RFC 6386 §9.8)
@@ -79,7 +114,7 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi, numMBs int, mbs []ma
 		//   If not B_PRED: DC_PRED vs {V_PRED, H_PRED, TM_PRED}
 		//   If not DC_PRED: V_PRED vs {H_PRED, TM_PRED}
 		//   If not V_PRED: H_PRED vs TM_PRED
-		encodeYMode(enc, mb.lumaMode)
+		encodeYMode(enc, mb.lumaMode, mb.bModes)
 
 		// Encode uv_mode (chroma mode) using the chroma mode tree.
 		encodeUVMode(enc, mb.chromaMode)
@@ -87,11 +122,12 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi, numMBs int, mbs []ma
 }
 
 // encodeYMode encodes the 16x16 luma prediction mode using the VP8 mode tree.
+// When mode is B_PRED, it also encodes the 16 sub-block modes.
 // Reference: RFC 6386 §11.2
 // Decoder reads: readBit(145) -> if false: B_PRED mode (parse 16 sub-block modes)
 //
 //	-> if true: 16x16 mode, then parse which mode
-func encodeYMode(enc *boolEncoder, mode intraMode) {
+func encodeYMode(enc *boolEncoder, mode intraMode, bModes [16]intraBMode) {
 	// Key-frame y_mode probabilities (from decoder)
 	const prob16x16 = 145 // true = 16x16 mode, false = B_PRED
 	const probDCvsRest = 156
@@ -101,8 +137,8 @@ func encodeYMode(enc *boolEncoder, mode intraMode) {
 	if mode == B_PRED {
 		// B_PRED: readBit(145) returns false
 		enc.putBit(prob16x16, false)
-		// For B_PRED, encoder would need to write 16 sub-block modes
-		// (not implemented - would need separate function)
+		// Encode 16 sub-block modes
+		encodeBPredModes(enc, bModes)
 		return
 	}
 
@@ -136,6 +172,209 @@ func encodeYMode(enc *boolEncoder, mode intraMode) {
 	}
 }
 
+// kfBModeProb contains the key-frame sub-block mode probabilities.
+// For each of the 10 possible left modes, there are 10 rows (for each above mode),
+// and each row has 9 probability values for the binary tree.
+// Reference: RFC 6386 §12.1, Table 13.
+var kfBModeProb = [10][10][9]uint8{
+	// left=B_DC_PRED
+	{
+		{231, 120, 48, 89, 115, 113, 120, 152, 112}, // above=B_DC_PRED
+		{152, 179, 64, 126, 170, 118, 46, 70, 95},   // above=B_TM_PRED
+		{175, 69, 143, 80, 85, 82, 72, 155, 103},    // above=B_VE_PRED
+		{56, 58, 10, 171, 218, 189, 17, 13, 152},    // above=B_HE_PRED
+		{144, 71, 10, 38, 171, 213, 144, 34, 26},    // above=B_LD_PRED
+		{114, 26, 17, 163, 44, 195, 21, 10, 173},    // above=B_RD_PRED
+		{121, 24, 80, 195, 26, 62, 44, 64, 85},      // above=B_VR_PRED
+		{170, 46, 55, 19, 136, 160, 33, 206, 71},    // above=B_VL_PRED
+		{63, 20, 8, 114, 114, 208, 12, 9, 226},      // above=B_HD_PRED
+		{81, 40, 11, 96, 182, 84, 29, 16, 36},       // above=B_HU_PRED
+	},
+	// left=B_TM_PRED
+	{
+		{134, 183, 89, 137, 98, 101, 106, 165, 148},
+		{72, 187, 100, 130, 157, 111, 32, 75, 80},
+		{66, 102, 167, 99, 74, 62, 40, 234, 128},
+		{41, 53, 9, 178, 241, 141, 26, 8, 107},
+		{104, 79, 12, 27, 217, 255, 87, 17, 7},
+		{74, 43, 26, 146, 73, 166, 49, 23, 157},
+		{65, 38, 105, 160, 51, 52, 31, 115, 128},
+		{87, 68, 71, 44, 114, 51, 15, 186, 23},
+		{47, 41, 14, 110, 182, 183, 21, 17, 194},
+		{66, 45, 25, 102, 197, 189, 23, 18, 22},
+	},
+	// left=B_VE_PRED
+	{
+		{88, 88, 147, 150, 42, 46, 45, 196, 205},
+		{43, 97, 183, 117, 85, 38, 35, 179, 61},
+		{39, 53, 200, 87, 26, 21, 43, 232, 171},
+		{56, 34, 51, 104, 114, 102, 29, 93, 77},
+		{107, 54, 32, 26, 51, 1, 81, 43, 31},
+		{39, 28, 85, 171, 58, 165, 90, 98, 64},
+		{34, 22, 116, 206, 23, 34, 43, 166, 73},
+		{68, 25, 106, 22, 64, 171, 36, 225, 114},
+		{34, 19, 21, 102, 132, 188, 16, 76, 124},
+		{62, 18, 78, 95, 85, 57, 50, 48, 51},
+	},
+	// left=B_HE_PRED
+	{
+		{193, 101, 35, 159, 215, 111, 89, 46, 111},
+		{60, 148, 31, 172, 219, 228, 21, 18, 111},
+		{112, 113, 77, 85, 179, 255, 38, 120, 114},
+		{40, 42, 1, 196, 245, 209, 10, 25, 109},
+		{100, 80, 8, 43, 154, 1, 51, 26, 71},
+		{88, 43, 29, 140, 166, 213, 37, 43, 154},
+		{61, 63, 30, 155, 67, 45, 68, 1, 209},
+		{142, 78, 78, 16, 255, 128, 34, 197, 171},
+		{41, 40, 5, 102, 211, 183, 4, 1, 221},
+		{51, 50, 17, 168, 209, 192, 23, 25, 82},
+	},
+	// left=B_LD_PRED
+	{
+		{138, 31, 36, 171, 27, 166, 38, 44, 229},
+		{67, 87, 58, 169, 82, 115, 26, 59, 179},
+		{63, 59, 90, 180, 59, 166, 93, 73, 154},
+		{40, 40, 21, 116, 143, 209, 34, 39, 175},
+		{57, 46, 22, 24, 128, 1, 54, 17, 37},
+		{47, 15, 16, 183, 34, 223, 49, 45, 183},
+		{46, 17, 33, 183, 6, 98, 15, 32, 183},
+		{65, 32, 73, 115, 28, 128, 23, 128, 205},
+		{40, 3, 9, 115, 51, 192, 18, 6, 223},
+		{87, 37, 9, 115, 59, 77, 64, 21, 47},
+	},
+	// left=B_RD_PRED
+	{
+		{104, 55, 44, 218, 9, 54, 53, 130, 226},
+		{64, 90, 70, 205, 40, 41, 23, 26, 57},
+		{54, 57, 112, 184, 5, 41, 38, 166, 213},
+		{30, 34, 26, 133, 152, 116, 10, 32, 134},
+		{75, 32, 12, 51, 192, 255, 160, 43, 51},
+		{39, 19, 53, 221, 26, 114, 32, 73, 255},
+		{31, 9, 65, 234, 2, 15, 1, 118, 73},
+		{88, 31, 35, 67, 102, 85, 55, 186, 85},
+		{56, 21, 23, 111, 59, 205, 45, 37, 192},
+		{55, 38, 70, 124, 73, 102, 1, 34, 98},
+	},
+	// left=B_VR_PRED
+	{
+		{125, 98, 42, 88, 104, 85, 117, 175, 82},
+		{95, 84, 53, 89, 128, 100, 113, 101, 45},
+		{75, 79, 123, 47, 51, 128, 81, 171, 1},
+		{57, 17, 5, 71, 102, 57, 53, 41, 49},
+		{115, 21, 2, 10, 102, 255, 166, 23, 6},
+		{38, 33, 13, 121, 57, 73, 26, 1, 85},
+		{41, 10, 67, 138, 77, 110, 90, 47, 114},
+		{101, 29, 16, 10, 85, 128, 101, 196, 26},
+		{57, 18, 10, 102, 102, 213, 34, 20, 43},
+		{117, 20, 15, 36, 163, 128, 68, 1, 26},
+	},
+	// left=B_VL_PRED
+	{
+		{138, 31, 36, 171, 27, 166, 38, 44, 229},
+		{67, 87, 58, 169, 82, 115, 26, 59, 179},
+		{63, 59, 90, 180, 59, 166, 93, 73, 154},
+		{40, 40, 21, 116, 143, 209, 34, 39, 175},
+		{57, 46, 22, 24, 128, 1, 54, 17, 37},
+		{47, 15, 16, 183, 34, 223, 49, 45, 183},
+		{46, 17, 33, 183, 6, 98, 15, 32, 183},
+		{65, 32, 73, 115, 28, 128, 23, 128, 205},
+		{40, 3, 9, 115, 51, 192, 18, 6, 223},
+		{87, 37, 9, 115, 59, 77, 64, 21, 47},
+	},
+	// left=B_HD_PRED
+	{
+		{101, 75, 35, 218, 9, 54, 53, 130, 226},
+		{64, 90, 70, 205, 40, 41, 23, 26, 57},
+		{54, 57, 112, 184, 5, 41, 38, 166, 213},
+		{30, 34, 26, 133, 152, 116, 10, 32, 134},
+		{75, 32, 12, 51, 192, 255, 160, 43, 51},
+		{39, 19, 53, 221, 26, 114, 32, 73, 255},
+		{31, 9, 65, 234, 2, 15, 1, 118, 73},
+		{88, 31, 35, 67, 102, 85, 55, 186, 85},
+		{56, 21, 23, 111, 59, 205, 45, 37, 192},
+		{55, 38, 70, 124, 73, 102, 1, 34, 98},
+	},
+	// left=B_HU_PRED
+	{
+		{101, 75, 35, 218, 9, 54, 53, 130, 226},
+		{64, 90, 70, 205, 40, 41, 23, 26, 57},
+		{54, 57, 112, 184, 5, 41, 38, 166, 213},
+		{30, 34, 26, 133, 152, 116, 10, 32, 134},
+		{75, 32, 12, 51, 192, 255, 160, 43, 51},
+		{39, 19, 53, 221, 26, 114, 32, 73, 255},
+		{31, 9, 65, 234, 2, 15, 1, 118, 73},
+		{88, 31, 35, 67, 102, 85, 55, 186, 85},
+		{56, 21, 23, 111, 59, 205, 45, 37, 192},
+		{55, 38, 70, 124, 73, 102, 1, 34, 98},
+	},
+}
+
+// encodeBPredModes encodes the 16 sub-block modes for a B_PRED macroblock.
+// Reference: RFC 6386 §12.1
+func encodeBPredModes(enc *boolEncoder, bModes [16]intraBMode) {
+	// The sub-block mode tree uses context from above and left modes.
+	// For the first row/column, we assume B_DC_PRED as the context mode.
+	const dcContext = B_DC_PRED
+
+	for blockIdx := 0; blockIdx < 16; blockIdx++ {
+		by := blockIdx / 4
+		bx := blockIdx % 4
+
+		// Get context modes (above and left sub-block modes)
+		var aboveMode, leftMode intraBMode
+		if by == 0 {
+			aboveMode = dcContext // No above sub-block, use default
+		} else {
+			aboveMode = bModes[(by-1)*4+bx]
+		}
+		if bx == 0 {
+			leftMode = dcContext // No left sub-block, use default
+		} else {
+			leftMode = bModes[by*4+(bx-1)]
+		}
+
+		// Encode this sub-block mode using the probability table
+		encodeBMode(enc, bModes[blockIdx], aboveMode, leftMode)
+	}
+}
+
+// encodeBMode encodes a single 4×4 sub-block mode using the context-dependent tree.
+// Reference: RFC 6386 §12.1
+func encodeBMode(enc *boolEncoder, mode, aboveMode, leftMode intraBMode) {
+	// Get the probability row for this context
+	probs := kfBModeProb[leftMode][aboveMode]
+
+	// The sub-block mode tree structure (RFC 6386 §12.1):
+	// At each node, we branch based on a probability and the mode value.
+	// Tree structure:
+	//   prob[0]: B_DC_PRED (false) vs rest (true)
+	//   If rest:
+	//     prob[1]: B_TM_PRED (false) vs rest (true)
+	//     If rest:
+	//       prob[2]: B_VE_PRED (false) vs rest (true)
+	//       ... and so on
+
+	// Mode indices in tree order: DC, TM, VE, HE, LD, RD, VR, VL, HD, HU
+	treeOrder := [10]intraBMode{
+		B_DC_PRED, B_TM_PRED, B_VE_PRED, B_HE_PRED, B_LD_PRED,
+		B_RD_PRED, B_VR_PRED, B_VL_PRED, B_HD_PRED, B_HU_PRED,
+	}
+
+	// Find which index in tree order matches our mode
+	for i, treeMode := range treeOrder {
+		if mode == treeMode {
+			// Encode the path to this mode
+			for j := 0; j < i; j++ {
+				enc.putBit(probs[j], true) // not this mode
+			}
+			if i < 9 {
+				enc.putBit(probs[i], false) // this is the mode
+			}
+			return
+		}
+	}
+}
+
 // encodeUVMode encodes the 8x8 chroma prediction mode using the VP8 mode tree.
 // Reference: RFC 6386 §11.2
 func encodeUVMode(enc *boolEncoder, mode chromaMode) {
@@ -166,24 +405,50 @@ func encodeUVMode(enc *boolEncoder, mode chromaMode) {
 // BuildKeyFrame constructs a complete VP8 key-frame bitstream from a
 // processed macroblock slice. It returns the raw VP8 frame bytes suitable
 // for RTP packetisation.
-func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
+//
+// Parameters:
+//   - width, height: frame dimensions (must be positive and even)
+//   - qi: base quantizer index [0, 127]
+//   - y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta: per-plane quantizer deltas
+//   - partCount: number of DCT partitions (OnePartition, TwoPartitions, etc.)
+//   - mbs: processed macroblocks
+func BuildKeyFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int, partCount PartitionCount, mbs []macroblock) ([]byte, error) {
 	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
 		return nil, errInvalidDimensions
 	}
 
 	mbW := (width + 15) / 16
+	mbH := (height + 15) / 16
+
+	deltas := QuantDeltas{
+		Y1DC: y1DCDelta,
+		Y2DC: y2DCDelta,
+		Y2AC: y2ACDelta,
+		UVDC: uvDCDelta,
+		UVAC: uvACDelta,
+	}
 
 	// Encode first partition (frame header + MB modes).
 	partEnc := newBoolEncoder()
-	encodeFrameHeader(partEnc, width, height, qi, len(mbs), mbs)
+	encodeFrameHeader(partEnc, width, height, qi, deltas, partCount, len(mbs), mbs)
 	firstPart := partEnc.flush()
 
-	// Second partition (residual data): encode DCT coefficients for non-skip MBs.
-	residualEnc := newBoolEncoder()
+	// Encode residual partitions
 	coeffProbs := DefaultCoeffProbs
-	tokenEnc := NewTokenEncoder(residualEnc, &coeffProbs)
-	encodeResidualPartition(tokenEnc, mbs, mbW)
-	secondPart := residualEnc.flush()
+	var residualParts [][]byte
+
+	if partCount == OnePartition {
+		// Single partition: use simple token encoder
+		residualEnc := newBoolEncoder()
+		tokenEnc := NewTokenEncoder(residualEnc, &coeffProbs)
+		encodeResidualPartition(tokenEnc, mbs, mbW)
+		residualParts = [][]byte{residualEnc.flush()}
+	} else {
+		// Multiple partitions: distribute by macroblock row
+		pw := NewPartitionWriter(partCount, &coeffProbs)
+		encodeResidualMultiPartition(pw, mbs, mbW, mbH)
+		residualParts = pw.Finalize()
+	}
 
 	firstPartSize := len(firstPart)
 
@@ -197,7 +462,12 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 	tag |= 1 << 4                     // show_frame = 1
 	tag |= uint32(firstPartSize) << 5 // first_part_size
 
-	out := make([]byte, 0, 3+3+4+firstPartSize+len(secondPart))
+	// Calculate total size
+	partSizes := BuildPartitionSizes(residualParts)
+	residualData := ConcatPartitions(residualParts)
+	totalSize := 3 + 3 + 4 + firstPartSize + len(partSizes) + len(residualData)
+
+	out := make([]byte, 0, totalSize)
 	out = append(out, byte(tag), byte(tag>>8), byte(tag>>16))
 
 	// Key-frame start code.
@@ -211,10 +481,169 @@ func BuildKeyFrame(width, height, qi int, mbs []macroblock) ([]byte, error) {
 
 	// First partition data.
 	out = append(out, firstPart...)
-	// Second (residual) partition data.
-	out = append(out, secondPart...)
+
+	// Partition sizes (if multiple partitions)
+	out = append(out, partSizes...)
+
+	// Residual partition data.
+	out = append(out, residualData...)
 
 	return out, nil
+}
+
+// encodeResidualMultiPartition encodes DCT coefficients using multiple partitions.
+// Macroblocks are distributed across partitions by row.
+func encodeResidualMultiPartition(pw *PartitionWriter, mbs []macroblock, mbW, mbH int) {
+	// Track non-zero status for context calculation
+	leftNzY16 := uint8(0)
+	upNzY16 := make([]uint8, mbW)
+	leftNzMaskY := uint8(0)
+	upNzMaskY := make([]uint8, mbW)
+	leftNzMaskUV := uint8(0)
+	upNzMaskUV := make([]uint8, mbW)
+
+	for mbIdx, mb := range mbs {
+		mbX := mbIdx % mbW
+		mbY := mbIdx / mbW
+
+		if mbX == 0 && mbIdx > 0 {
+			leftNzY16 = 0
+			leftNzMaskY = 0
+			leftNzMaskUV = 0
+		}
+
+		// Get token encoder for this row's partition
+		te := pw.GetTokenEncoder(mbY)
+
+		if mb.skip {
+			leftNzY16 = 0
+			upNzY16[mbX] = 0
+			leftNzMaskY = 0
+			upNzMaskY[mbX] = 0
+			leftNzMaskUV = 0
+			upNzMaskUV[mbX] = 0
+			continue
+		}
+
+		// Encode Y2 block for 16x16 modes
+		if mb.lumaMode != B_PRED {
+			y2Context := int(leftNzY16 + upNzY16[mbX])
+			if y2Context > 2 {
+				y2Context = 2
+			}
+			nz := te.EncodeBlockWithContext(mb.y2Coeffs, PlaneY2, 0, y2Context)
+			nzVal := uint8(0)
+			if nz {
+				nzVal = 1
+			}
+			leftNzY16 = nzVal
+			upNzY16[mbX] = nzVal
+		}
+
+		// Encode Y blocks
+		yPlane := PlaneY1WithY2
+		firstYCoeff := 1
+		if mb.lumaMode == B_PRED {
+			yPlane = PlaneY1SansY2
+			firstYCoeff = 0
+		}
+
+		var lnz, unz [4]uint8
+		for i := 0; i < 4; i++ {
+			lnz[i] = (leftNzMaskY >> i) & 1
+			unz[i] = (upNzMaskY[mbX] >> i) & 1
+		}
+
+		var newLeftNzMaskY, newUpNzMaskY uint8
+		for blockY := 0; blockY < 4; blockY++ {
+			nz := lnz[blockY]
+			for blockX := 0; blockX < 4; blockX++ {
+				blockIdx := blockY*4 + blockX
+				ctx := int(nz + unz[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.yCoeffs[blockIdx], yPlane, firstYCoeff, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unz[blockX] = nzVal
+			}
+			lnz[blockY] = nz
+			newLeftNzMaskY |= nz << blockY
+		}
+		for i := 0; i < 4; i++ {
+			newUpNzMaskY |= unz[i] << i
+		}
+		leftNzMaskY = newLeftNzMaskY
+		upNzMaskY[mbX] = newUpNzMaskY
+
+		// Encode U blocks
+		var lnzUV, unzUV [2]uint8
+		lnzUV[0] = (leftNzMaskUV >> 0) & 1
+		lnzUV[1] = (leftNzMaskUV >> 1) & 1
+		unzUV[0] = (upNzMaskUV[mbX] >> 0) & 1
+		unzUV[1] = (upNzMaskUV[mbX] >> 1) & 1
+
+		var newLeftNzMaskU, newUpNzMaskU uint8
+		for blockY := 0; blockY < 2; blockY++ {
+			nz := lnzUV[blockY]
+			for blockX := 0; blockX < 2; blockX++ {
+				blockIdx := blockY*2 + blockX
+				ctx := int(nz + unzUV[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.uCoeffs[blockIdx], PlaneUV, 0, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unzUV[blockX] = nzVal
+			}
+			lnzUV[blockY] = nz
+			newLeftNzMaskU |= nz << blockY
+		}
+		for i := 0; i < 2; i++ {
+			newUpNzMaskU |= unzUV[i] << i
+		}
+
+		// Encode V blocks
+		lnzUV[0] = (leftNzMaskUV >> 2) & 1
+		lnzUV[1] = (leftNzMaskUV >> 3) & 1
+		unzUV[0] = (upNzMaskUV[mbX] >> 2) & 1
+		unzUV[1] = (upNzMaskUV[mbX] >> 3) & 1
+
+		var newLeftNzMaskV, newUpNzMaskV uint8
+		for blockY := 0; blockY < 2; blockY++ {
+			nz := lnzUV[blockY]
+			for blockX := 0; blockX < 2; blockX++ {
+				blockIdx := blockY*2 + blockX
+				ctx := int(nz + unzUV[blockX])
+				if ctx > 2 {
+					ctx = 2
+				}
+				hasNz := te.EncodeBlockWithContext(mb.vCoeffs[blockIdx], PlaneUV, 0, ctx)
+				nzVal := uint8(0)
+				if hasNz {
+					nzVal = 1
+				}
+				nz = nzVal
+				unzUV[blockX] = nzVal
+			}
+			lnzUV[blockY] = nz
+			newLeftNzMaskV |= nz << blockY
+		}
+		for i := 0; i < 2; i++ {
+			newUpNzMaskV |= unzUV[i] << i
+		}
+
+		leftNzMaskUV = newLeftNzMaskU | (newLeftNzMaskV << 2)
+		upNzMaskUV[mbX] = newUpNzMaskU | (newUpNzMaskV << 2)
+	}
 }
 
 // encodeResidualPartition encodes DCT coefficients for all non-skip macroblocks.

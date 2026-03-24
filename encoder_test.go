@@ -181,6 +181,39 @@ func BenchmarkEncode640x480(b *testing.B) {
 	}
 }
 
+func BenchmarkEncode320x240(b *testing.B) {
+	enc, _ := NewEncoder(320, 240, 30)
+	yuv := makeYUV420(320, 240, 128)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := enc.Encode(yuv); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkEncode1280x720(b *testing.B) {
+	enc, _ := NewEncoder(1280, 720, 30)
+	yuv := makeYUV420(1280, 720, 128)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := enc.Encode(yuv); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkEncode1920x1080(b *testing.B) {
+	enc, _ := NewEncoder(1920, 1080, 30)
+	yuv := makeYUV420(1920, 1080, 128)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := enc.Encode(yuv); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // makeGradientYUV420 creates a synthetic gradient YUV420 frame.
 // The luma plane has a horizontal gradient from left to right.
 func makeGradientYUV420(width, height int) []byte {
@@ -305,4 +338,129 @@ func calculatePSNR(src, dst []byte, width, height, dstStride int) float64 {
 		return 100.0 // perfect match
 	}
 	return 10.0 * math.Log10(255.0*255.0/mse)
+}
+
+// TestSetQuantizerDeltas verifies that quantizer deltas are correctly
+// stored in the encoder and that frames with deltas decode correctly.
+func TestSetQuantizerDeltas(t *testing.T) {
+	enc, err := NewEncoder(64, 64, 30)
+	if err != nil {
+		t.Fatalf("NewEncoder: %v", err)
+	}
+
+	// Set non-zero deltas
+	enc.SetQuantizerDeltas(2, -3, 4, -2, 1)
+
+	// Verify deltas are stored
+	if enc.y1DCDelta != 2 {
+		t.Errorf("y1DCDelta = %d, want 2", enc.y1DCDelta)
+	}
+	if enc.y2DCDelta != -3 {
+		t.Errorf("y2DCDelta = %d, want -3", enc.y2DCDelta)
+	}
+	if enc.y2ACDelta != 4 {
+		t.Errorf("y2ACDelta = %d, want 4", enc.y2ACDelta)
+	}
+	if enc.uvDCDelta != -2 {
+		t.Errorf("uvDCDelta = %d, want -2", enc.uvDCDelta)
+	}
+	if enc.uvACDelta != 1 {
+		t.Errorf("uvACDelta = %d, want 1", enc.uvACDelta)
+	}
+
+	// Encode a frame with deltas
+	yuv := makeYUV420(64, 64, 128)
+	vp8Data, err := enc.Encode(yuv)
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+
+	// Verify the frame decodes correctly
+	dec := vp8.NewDecoder()
+	dec.Init(bytes.NewReader(vp8Data), len(vp8Data))
+
+	fh, err := dec.DecodeFrameHeader()
+	if err != nil {
+		t.Fatalf("DecodeFrameHeader: %v", err)
+	}
+	if fh.Width != 64 || fh.Height != 64 {
+		t.Errorf("decoded dimensions %dx%d, want 64x64", fh.Width, fh.Height)
+	}
+
+	// Frame should decode without error
+	_, err = dec.DecodeFrame()
+	if err != nil {
+		t.Fatalf("DecodeFrame with deltas: %v", err)
+	}
+}
+
+// TestMultiPartitionEncode verifies that frames with multiple partitions
+// decode correctly with golang.org/x/image/vp8.
+func TestMultiPartitionEncode(t *testing.T) {
+	tests := []struct {
+		name       string
+		width      int
+		height     int
+		partitions PartitionCount
+	}{
+		{"single partition 64x64", 64, 64, OnePartition},
+		{"two partitions 64x64", 64, 64, TwoPartitions},
+		{"four partitions 64x64", 64, 64, FourPartitions},
+		{"eight partitions 128x128", 128, 128, EightPartitions},
+		{"two partitions 320x240", 320, 240, TwoPartitions},
+		{"four partitions 320x240", 320, 240, FourPartitions},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enc, err := NewEncoder(tt.width, tt.height, 30)
+			if err != nil {
+				t.Fatalf("NewEncoder: %v", err)
+			}
+
+			// Set partition count
+			enc.SetPartitionCount(tt.partitions)
+
+			// Create source YUV frame
+			srcYUV := makeYUV420(tt.width, tt.height, 128)
+
+			// Encode
+			vp8Data, err := enc.Encode(srcYUV)
+			if err != nil {
+				t.Fatalf("Encode: %v", err)
+			}
+
+			// Verify key frame marker
+			if vp8Data[0]&1 != 0 {
+				t.Errorf("expected key frame (bit0=0), got 0x%02x", vp8Data[0])
+			}
+
+			// Decode with golang.org/x/image/vp8
+			dec := vp8.NewDecoder()
+			dec.Init(bytes.NewReader(vp8Data), len(vp8Data))
+
+			fh, err := dec.DecodeFrameHeader()
+			if err != nil {
+				t.Fatalf("DecodeFrameHeader: %v", err)
+			}
+
+			// Verify dimensions match
+			if fh.Width != tt.width || fh.Height != tt.height {
+				t.Errorf("decoded dimensions %dx%d, want %dx%d",
+					fh.Width, fh.Height, tt.width, tt.height)
+			}
+
+			// Decode the frame
+			decoded, err := dec.DecodeFrame()
+			if err != nil {
+				t.Fatalf("DecodeFrame: %v", err)
+			}
+
+			// Verify decoded frame is reasonable (PSNR > 20 dB for solid gray)
+			psnr := calculatePSNR(srcYUV[:tt.width*tt.height], decoded.Y, tt.width, tt.height, decoded.YStride)
+			if psnr < 20.0 {
+				t.Errorf("PSNR %.2f dB below threshold 20.0 dB", psnr)
+			}
+		})
+	}
 }

@@ -76,9 +76,9 @@ The project has detailed internal tracking in `GAPS.md`. Current status:
 | Residual coding pipeline | ✅ CLOSED | Core functionality complete |
 | Prediction mode selection | ✅ CLOSED | Modes selected via SAD comparison |
 | WebRTC interoperability | ✅ CLOSED | Verified via decode test |
-| **B_PRED mode never used** | ⚠️ Open | Code exists but not wired into encoder |
-| **Multiple partitions never used** | ⚠️ Open | Infrastructure exists but not wired |
-| **Quantizer deltas not configurable** | ⚠️ Open | Tables exist but no API exposure |
+| **B_PRED mode never used** | ⚠️ Blocked | Infrastructure complete but decode bug prevents activation |
+| **Multiple partitions never used** | ✅ CLOSED | Now wired - SetPartitionCount() enables 2/4/8 partitions |
+| **Quantizer deltas not configurable** | ✅ CLOSED | SetQuantizerDeltas() API exposed |
 | **Token probability updates not used** | ⚠️ Open | Functions exist but not called |
 
 ---
@@ -89,54 +89,55 @@ The project has detailed internal tracking in `GAPS.md`. Current status:
 
 The README states "Residuals are skipped (all macroblocks use DC prediction with zero residuals)" but this is no longer true—the encoder now computes and encodes actual residuals.
 
-- [ ] Update README.md §Limitations to reflect current state:
+- [x] Update README.md §Limitations to reflect current state:
   - Remove "Residuals are skipped" 
   - Note that residuals are now computed via DCT/WHT pipeline
   - Keep "I-frame only", "No loop filter" as accurate limitations
-- [ ] Update README.md §Output format description to mention residuals are now present
+- [x] Update README.md §Output format description to mention residuals are now present
 - **Validation**: README should accurately describe encoder behavior
 
 ### Priority 2: Expose Quantizer Delta API
 
 Per-plane quantizer deltas are implemented in `quant.go` but not accessible. This limits quality tuning for professional use cases.
 
-- [ ] Add delta fields to `Encoder` struct in `encoder.go`:
+- [x] Add delta fields to `Encoder` struct in `encoder.go`:
   ```go
   y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int
   ```
-- [ ] Add `SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int)` method
-- [ ] Update `Encode()` to call `GetQuantFactors()` with deltas instead of `GetQuantFactorsSimple()`
-- [ ] Modify `encodeFrameHeader()` in `bitstream.go:44-54` to emit deltas when non-zero
+- [x] Add `SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int)` method
+- [x] Update `Encode()` to call `GetQuantFactors()` with deltas instead of `GetQuantFactorsSimple()`
+- [x] Modify `encodeFrameHeader()` in `bitstream.go:44-54` to emit deltas when non-zero
 - **Validation**: New test verifying delta values appear in encoded header; decode still succeeds
 
 ### Priority 3: Wire B_PRED Mode Selection
 
 The 4×4 B_PRED sub-modes are fully implemented in `bpred.go` but never selected. This limits compression efficiency for content with local detail variations.
 
-- [ ] Add B_PRED vs 16×16 mode decision in `processMacroblock()`:
+- [x] Add B_PRED vs 16×16 mode decision in `processMacroblock()`:
   - Compare best 16×16 mode SAD vs sum of best 4×4 mode SADs
   - Select B_PRED if 4×4 SAD is significantly better (threshold TBD)
-- [ ] When B_PRED wins, populate `mb.bModes[16]` with selected sub-modes
-- [ ] Update `encodeYMode()` in `bitstream.go:94-107` to emit 16 sub-block modes when `mode == B_PRED`
-- [ ] Update `encodeResidualPartition()` to use `PlaneY1SansY2` for B_PRED macroblocks
+- [x] When B_PRED wins, populate `mb.bModes[16]` with selected sub-modes
+- [x] Update `encodeYMode()` in `bitstream.go:94-107` to emit 16 sub-block modes when `mode == B_PRED`
+- [x] Update `encodeResidualPartition()` to use `PlaneY1SansY2` for B_PRED macroblocks
+- [ ] **BLOCKED**: Fix B_PRED bitstream encoding - frames with B_PRED macroblocks fail to decode with "unexpected EOF". Infrastructure is complete but `bPredSADThreshold=0` disables selection.
 - **Validation**: Test with high-detail content showing B_PRED selection improves PSNR
 
 ### Priority 4: Enable Multiple Partitions
 
-Multi-partition encoding infrastructure exists in `partition.go` but is never used. This blocks potential multi-core parallelism.
+Multi-partition encoding infrastructure exists in `partition.go` and is now fully wired into the encoder.
 
-- [ ] Add `PartitionCount` field to `Encoder` struct with default `OnePartition`
-- [ ] Add `SetPartitionCount(count PartitionCount)` method
-- [ ] Modify `BuildKeyFrame()` to use `PartitionWriter` when count > 1
-- [ ] Update `encodeFrameHeader()` to emit correct `nb_dct_partitions` value
-- [ ] Use `AssembleMultiPartitionFrame()` in frame assembly path
-- **Validation**: Test that 2/4/8 partition frames decode correctly
+- [x] Add `PartitionCount` field to `Encoder` struct with default `OnePartition`
+- [x] Add `SetPartitionCount(count PartitionCount)` method
+- [x] Modify `BuildKeyFrame()` to use `PartitionWriter` when count > 1
+- [x] Update `encodeFrameHeader()` to emit correct `nb_dct_partitions` value
+- [x] Use partition assembly functions in frame assembly path
+- [x] **Validation**: Test that 2/4/8 partition frames decode correctly (TestMultiPartitionEncode)
 
 ### Priority 5: Add CI Pipeline
 
 No automated testing exists, increasing regression risk.
 
-- [ ] Create `.github/workflows/ci.yml`:
+- [x] Create `.github/workflows/ci.yml`:
   - Run `go test -race ./...` on push/PR
   - Run `go vet ./...`
   - Test on Linux, macOS, Windows
@@ -147,9 +148,9 @@ No automated testing exists, increasing regression risk.
 
 The project has one benchmark (`BenchmarkEncode640x480`) but no systematic performance tracking.
 
-- [ ] Add benchmarks for common resolutions: 320×240, 640×480, 1280×720, 1920×1080
-- [ ] Add benchmark comparing with/without B_PRED
-- [ ] Document baseline performance numbers in README
+- [x] Add benchmarks for common resolutions: 320×240, 640×480, 1280×720, 1920×1080
+- [ ] Add benchmark comparing with/without B_PRED (blocked on Priority 3)
+- [x] Document baseline performance numbers in README
 - **Validation**: `go test -bench=.` produces actionable data
 
 ---

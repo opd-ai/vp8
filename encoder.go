@@ -7,8 +7,6 @@
 //
 // Limitations:
 //   - I-frame only (every Encode call produces a key frame).
-//   - Residuals are skipped (all macroblocks coded as DC_PRED with zero
-//     residuals). Quality is limited but the bitstream is valid.
 //   - No loop filter, no segmentation, no temporal scalability.
 //
 // Usage:
@@ -30,6 +28,18 @@ type Encoder struct {
 	fps     int
 	bitrate int // target bitrate in bits/s (used to derive quantizer)
 	qi      int // quantizer index [0, 127]
+
+	// Quantizer delta fields for per-plane adjustments.
+	// These are added to the base qi for specific coefficient types.
+	y1DCDelta int // Y1 DC coefficient delta
+	y2DCDelta int // Y2 (WHT DC-of-DC) DC coefficient delta
+	y2ACDelta int // Y2 AC coefficient delta
+	uvDCDelta int // Chroma DC coefficient delta
+	uvACDelta int // Chroma AC coefficient delta
+
+	// partitionCount controls the number of DCT/residual partitions.
+	// Default is OnePartition. Use SetPartitionCount to enable multi-partition encoding.
+	partitionCount PartitionCount
 }
 
 // NewEncoder creates a new VP8 Encoder for frames of the given dimensions
@@ -77,6 +87,38 @@ func (e *Encoder) SetBitrate(bitrate int) {
 // a no-op kept for API compatibility.
 func (e *Encoder) ForceKeyFrame() {}
 
+// SetPartitionCount configures the number of DCT/residual partitions.
+// VP8 supports 1, 2, 4, or 8 partitions. Multiple partitions can enable
+// parallel decoding and provide error resilience.
+//
+// Valid values: OnePartition, TwoPartitions, FourPartitions, EightPartitions.
+// Default is OnePartition.
+func (e *Encoder) SetPartitionCount(count PartitionCount) {
+	e.partitionCount = count
+}
+
+// SetQuantizerDeltas configures per-plane quantizer delta values.
+// These deltas are added to the base quantizer index (qi) for specific
+// coefficient types, allowing fine-tuned quality trade-offs.
+//
+// Parameters:
+//   - y1dc: delta for Y1 (luma 4x4 block) DC coefficients
+//   - y2dc: delta for Y2 (WHT DC-of-DC) DC coefficients
+//   - y2ac: delta for Y2 AC coefficients
+//   - uvdc: delta for chroma DC coefficients
+//   - uvac: delta for chroma AC coefficients
+//
+// Positive deltas increase quantization (lower quality, smaller size).
+// Negative deltas decrease quantization (higher quality, larger size).
+// Deltas are clamped so that qi+delta stays within [0, 127].
+func (e *Encoder) SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int) {
+	e.y1DCDelta = y1dc
+	e.y2DCDelta = y2dc
+	e.y2ACDelta = y2ac
+	e.uvDCDelta = uvdc
+	e.uvACDelta = uvac
+}
+
 // Encode encodes a raw YUV420 (I420) frame and returns a VP8 key-frame
 // bitstream. The yuv slice must be at least width*height*3/2 bytes long,
 // laid out as the full luma plane followed by the Cb then Cr chroma planes.
@@ -92,8 +134,8 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 	mbW := (e.width + 15) / 16
 	mbH := (e.height + 15) / 16
 
-	// Get quantization factors for the current quantizer index
-	qf := GetQuantFactorsSimple(e.qi)
+	// Get quantization factors for the current quantizer index with deltas
+	qf := GetQuantFactors(e.qi, e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta)
 
 	// Chroma dimensions (half of luma)
 	chromaW := e.width / 2
@@ -147,7 +189,7 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 		}
 	}
 
-	return BuildKeyFrame(e.width, e.height, e.qi, mbs)
+	return BuildKeyFrame(e.width, e.height, e.qi, e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta, e.partitionCount, mbs)
 }
 
 // buildMBContext extracts neighbor pixels for prediction.

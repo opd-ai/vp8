@@ -70,26 +70,14 @@ This document identifies gaps between the project's stated goals and its current
 
 ---
 
-## Gap 5: Quantizer Deltas Not Configurable
+## Gap 5: Quantizer Deltas Not Configurable ✅ CLOSED
 
-- **Stated Goal**: ROADMAP.md §1.1 claims:
-  > "Expose per-plane quantizer deltas (y_dc_delta, y2_dc_delta, ...)"
-  
-  Marked ✅ implemented.
-
-- **Current State**: `quant.go` provides `GetQuantFactors()` accepting all delta parameters. However:
-  - `Encoder` struct has no delta fields
-  - `bitstream.go:44-54` always writes deltas as 0 (delta_present=false)
-  - No API exposes delta configuration
-
-- **Impact**:
-  - Cannot tune quality trade-offs between luma DC, luma AC, and chroma
-  - Professional video encoding scenarios limited
-
-- **Closing the Gap**:
-  1. Add delta fields to `Encoder`: `y1DCDelta`, `y2DCDelta`, etc.
-  2. Add setter method: `SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int)`
-  3. Update `encodeFrameHeader()` to conditionally encode deltas when non-zero
+- **Status**: CLOSED as of 2026-03-24
+- **Resolution**: Added `SetQuantizerDeltas()` method and wired deltas into encoding:
+  - Delta fields added to `Encoder` struct
+  - `SetQuantizerDeltas()` API method added
+  - `encodeFrameHeader()` conditionally encodes deltas when non-zero
+  - `GetQuantFactors()` called with deltas in `Encode()`
 
 ---
 
@@ -135,7 +123,7 @@ This document identifies gaps between the project's stated goals and its current
 | Gap 2: Prediction mode selection | MEDIUM | LOW | ✅ CLOSED |
 | Gap 3: B_PRED mode | LOW | MEDIUM | Open |
 | Gap 4: Multiple partitions | LOW | LOW | Open |
-| Gap 5: Quantizer deltas | LOW | LOW | Open |
+| Gap 5: Quantizer deltas | LOW | LOW | ✅ CLOSED |
 | Gap 6: Probability updates | LOW | MEDIUM | Open |
 | Gap 7: WebRTC interop tests | MEDIUM | LOW | ✅ CLOSED |
 
