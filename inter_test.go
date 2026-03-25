@@ -734,7 +734,7 @@ func TestSnapMVTo2Pel(t *testing.T) {
 		{motionVector{4, 4}, motionVector{8, 8}},       // 1-pel rounds up to 2-pel
 		{motionVector{8, 8}, motionVector{8, 8}},       // already 2-pel
 		{motionVector{-8, -8}, motionVector{-8, -8}},   // negative 2-pel
-		{motionVector{-4, -4}, motionVector{-8, -8}},   // negative rounds away
+		{motionVector{-4, -4}, motionVector{-8, -8}},   // negative 1-pel rounds away from zero to -2-pel
 		{motionVector{16, -16}, motionVector{16, -16}},  // 4-pel
 		{motionVector{3, -3}, motionVector{0, 0}},       // small values round to zero
 		{motionVector{12, -12}, motionVector{16, -16}},  // rounds up

@@ -35,7 +35,9 @@ func snapMVTo2Pel(mv motionVector) motionVector {
 }
 
 // snapComponentTo2Pel rounds a single MV component to the nearest
-// multiple of 8 quarter-pixel units. Handles negative values correctly.
+// multiple of 8 quarter-pixel units. Negative values are rounded away
+// from zero (symmetric with positive rounding) to maintain consistent
+// search behavior in all directions.
 func snapComponentTo2Pel(v int16) int16 {
 	if v >= 0 {
 		return ((v + 4) / 8) * 8
