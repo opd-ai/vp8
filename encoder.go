@@ -1,19 +1,33 @@
-// Package vp8 provides a minimal pure-Go VP8 I-frame encoder.
+// Package vp8 provides a pure-Go VP8 encoder supporting both key frames
+// (I-frames) and inter frames (P-frames) with motion estimation.
 //
-// This implementation produces VP8 key-frames (I-frames) only. Inter-frame
-// (P-frame) coding is not supported. The output is a raw VP8 bitstream
-// suitable for RTP packetisation with github.com/pion/rtp/codecs.VP8Payloader,
-// or for writing into an IVF container with github.com/pion/webrtc ivfwriter.
+// The encoder produces VP8 bitstreams per RFC 6386, compatible with
+// WebRTC stacks (pion/rtp VP8Payloader, ivfwriter).
+//
+// In the default mode (keyFrameInterval=0), every Encode call produces a
+// key frame for backward compatibility. When SetKeyFrameInterval is called
+// with a positive value, the encoder produces inter frames using motion
+// estimation from reference frames between key frames.
 //
 // Limitations:
-//   - I-frame only (every Encode call produces a key frame).
-//   - No loop filter, no segmentation, no temporal scalability.
+//   - No sub-pixel motion estimation (integer-pel only).
+//   - No segmentation, no temporal scalability.
 //
-// Usage:
+// Usage (I-frame only):
 //
 //	enc, err := vp8.NewEncoder(640, 480, 30)
 //	if err != nil { ... }
 //	vp8Bytes, err := enc.Encode(yuvFrame)
+//
+// Usage (inter-frame):
+//
+//	enc, err := vp8.NewEncoder(640, 480, 30)
+//	if err != nil { ... }
+//	enc.SetKeyFrameInterval(30)
+//	enc.SetLoopFilterLevel(20)
+//	for _, yuv := range frames {
+//	    vp8Bytes, err := enc.Encode(yuv)
+//	}
 package vp8
 
 import (

@@ -311,11 +311,11 @@ func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDel
 	firstPartSize := len(firstPart)
 
 	// Frame tag (3 bytes, little-endian) for inter frame:
-	//   bits [0]:     key_frame = 1 (inter frame)
+	//   bits [0]:     frame_type: 1 = inter frame (0 = key frame)
 	//   bits [3:1]:   version = 0
 	//   bits [4]:     show_frame = 1
 	//   bits [23:5]:  first_part_size
-	tag := uint32(1)                  // key_frame = 1 (inter frame)
+	tag := uint32(1)                  // frame_type = 1 (inter frame)
 	tag |= 0 << 1                     // version = 0
 	tag |= 1 << 4                     // show_frame = 1
 	tag |= uint32(firstPartSize) << 5 // first_part_size

@@ -4,8 +4,9 @@ package vp8
 // Motion estimation finds the best matching block in a reference frame
 // for each macroblock in the current frame.
 //
-// VP8 uses integer-pel motion vectors with quarter-pel precision.
-// Reference: RFC 6386 §18 (Motion Vectors)
+// VP8 motion vectors are specified with quarter-pixel precision per RFC 6386 §18.
+// This implementation performs integer-pixel motion search only (motion vectors
+// are multiples of 4 quarter-pixels). Sub-pixel refinement may be added in future.
 
 // motionVector represents a VP8 motion vector with quarter-pel precision.
 // The values are in quarter-pixel units: dx=4 means 1 full pixel to the right.
