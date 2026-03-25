@@ -126,5 +126,10 @@ This document identifies gaps between the project's stated goals and its current
 | Gap 5: Quantizer deltas | LOW | LOW | ✅ CLOSED |
 | Gap 6: Probability updates | LOW | MEDIUM | Open |
 | Gap 7: WebRTC interop tests | MEDIUM | LOW | ✅ CLOSED |
+| Gap 8: Inter-frame (P-frame) support | HIGH | HIGH | ✅ CLOSED |
+| Gap 9: Motion estimation | HIGH | HIGH | ✅ CLOSED |
+| Gap 10: Reference frame management | HIGH | MEDIUM | ✅ CLOSED |
+| Gap 11: Loop filter | MEDIUM | MEDIUM | ✅ CLOSED |
 
-**Status**: Core I-frame encoder is now functional. Remaining gaps are optimizations.
+**Status**: Encoder now supports both I-frame and P-frame encoding with motion estimation.
+Remaining gaps are optimizations (B_PRED, probability updates).

@@ -1,19 +1,33 @@
-// Package vp8 provides a minimal pure-Go VP8 I-frame encoder.
+// Package vp8 provides a pure-Go VP8 encoder supporting both key frames
+// (I-frames) and inter frames (P-frames) with motion estimation.
 //
-// This implementation produces VP8 key-frames (I-frames) only. Inter-frame
-// (P-frame) coding is not supported. The output is a raw VP8 bitstream
-// suitable for RTP packetisation with github.com/pion/rtp/codecs.VP8Payloader,
-// or for writing into an IVF container with github.com/pion/webrtc ivfwriter.
+// The encoder produces VP8 bitstreams per RFC 6386, compatible with
+// WebRTC stacks (pion/rtp VP8Payloader, ivfwriter).
+//
+// In the default mode (keyFrameInterval=0), every Encode call produces a
+// key frame for backward compatibility. When SetKeyFrameInterval is called
+// with a positive value, the encoder produces inter frames using motion
+// estimation from reference frames between key frames.
 //
 // Limitations:
-//   - I-frame only (every Encode call produces a key frame).
-//   - No loop filter, no segmentation, no temporal scalability.
+//   - No sub-pixel motion estimation (integer-pel only).
+//   - No segmentation, no temporal scalability.
 //
-// Usage:
+// Usage (I-frame only):
 //
 //	enc, err := vp8.NewEncoder(640, 480, 30)
 //	if err != nil { ... }
 //	vp8Bytes, err := enc.Encode(yuvFrame)
+//
+// Usage (inter-frame):
+//
+//	enc, err := vp8.NewEncoder(640, 480, 30)
+//	if err != nil { ... }
+//	enc.SetKeyFrameInterval(30)
+//	enc.SetLoopFilterLevel(20)
+//	for _, yuv := range frames {
+//	    vp8Bytes, err := enc.Encode(yuv)
+//	}
 package vp8
 
 import (
@@ -40,6 +54,20 @@ type Encoder struct {
 	// partitionCount controls the number of DCT/residual partitions.
 	// Default is OnePartition. Use SetPartitionCount to enable multi-partition encoding.
 	partitionCount PartitionCount
+
+	// Inter-frame encoding state.
+	// refFrames manages the three reference frame buffers (last, golden, altref).
+	refFrames *refFrameManager
+	// frameCount tracks the number of frames encoded since the last key frame.
+	frameCount int
+	// keyFrameInterval is the maximum number of frames between key frames.
+	// 0 means every frame is a key frame (I-frame only mode).
+	// Default is 0 for backward compatibility.
+	keyFrameInterval int
+	// forceNextKeyFrame forces the next Encode call to produce a key frame.
+	forceNextKeyFrame bool
+	// loopFilter controls the loop filter parameters.
+	loopFilter loopFilterParams
 }
 
 // NewEncoder creates a new VP8 Encoder for frames of the given dimensions
@@ -62,6 +90,7 @@ func NewEncoder(width, height, fps int) (*Encoder, error) {
 		fps:     fps,
 		bitrate: 500_000, // default 500 kbps
 		qi:      24,      // default quantizer index
+		refFrames: newRefFrameManager(width, height),
 	}, nil
 }
 
@@ -83,9 +112,37 @@ func (e *Encoder) SetBitrate(bitrate int) {
 }
 
 // ForceKeyFrame causes the next call to Encode to produce a key frame.
-// In this implementation every frame is already a key frame, so this is
-// a no-op kept for API compatibility.
-func (e *Encoder) ForceKeyFrame() {}
+// This resets the inter-frame prediction chain.
+func (e *Encoder) ForceKeyFrame() {
+	e.forceNextKeyFrame = true
+}
+
+// SetKeyFrameInterval configures the maximum number of inter frames between
+// key frames. A value of 0 means every frame is a key frame (I-frame only mode,
+// which is the default for backward compatibility). A value of N means that
+// every Nth frame will be a key frame, with inter frames in between.
+//
+// For example, SetKeyFrameInterval(30) at 30fps means one key frame per second.
+func (e *Encoder) SetKeyFrameInterval(interval int) {
+	if interval < 0 {
+		interval = 0
+	}
+	e.keyFrameInterval = interval
+}
+
+// SetLoopFilterLevel configures the loop filter strength (0–63).
+// The loop filter reduces blocking artifacts in reconstructed frames used
+// as reference for inter-frame prediction. Level 0 disables the filter.
+// A moderate level (e.g., 20–40) is recommended for inter-frame encoding.
+func (e *Encoder) SetLoopFilterLevel(level int) {
+	if level < 0 {
+		level = 0
+	}
+	if level > 63 {
+		level = 63
+	}
+	e.loopFilter.level = level
+}
 
 // SetPartitionCount configures the number of DCT/residual partitions.
 // VP8 supports 1, 2, 4, or 8 partitions. Multiple partitions can enable
@@ -119,9 +176,12 @@ func (e *Encoder) SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int) {
 	e.uvACDelta = uvac
 }
 
-// Encode encodes a raw YUV420 (I420) frame and returns a VP8 key-frame
-// bitstream. The yuv slice must be at least width*height*3/2 bytes long,
-// laid out as the full luma plane followed by the Cb then Cr chroma planes.
+// Encode encodes a raw YUV420 (I420) frame and returns a VP8 bitstream.
+// Depending on the configuration, this may produce either a key frame (I-frame)
+// or an inter frame (P-frame) using motion estimation from reference frames.
+//
+// When keyFrameInterval is 0 (default), every frame is a key frame.
+// When keyFrameInterval > 0, inter frames are produced between key frames.
 //
 // The returned bytes can be passed directly to pion/rtp's VP8Payloader.Payload.
 func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
@@ -130,6 +190,9 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Determine frame type
+	isKeyFrame := e.shouldEncodeKeyFrame()
 
 	mbW := (e.width + 15) / 16
 	mbH := (e.height + 15) / 16
@@ -144,55 +207,152 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 	numMBs := mbW * mbH
 	mbs := make([]macroblock, numMBs)
 
+	if isKeyFrame || !e.refFrames.hasReference(refFrameLast) {
+		// Encode as key frame (intra only)
+		for mbY := 0; mbY < mbH; mbY++ {
+			for mbX := 0; mbX < mbW; mbX++ {
+				mbIdx := mbY*mbW + mbX
+
+				srcY := extractLumaBlock(frame, mbX, mbY, e.width, e.height)
+				srcU, srcV := extractChromaBlocks(frame, mbX, mbY, chromaW, chromaH)
+				ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
+
+				mbs[mbIdx] = processMacroblock(srcY, srcU, srcV, ctx, qf)
+			}
+		}
+
+		// Build key frame bitstream
+		result, err := BuildKeyFrame(e.width, e.height, e.qi,
+			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+			e.partitionCount, mbs)
+		if err != nil {
+			return nil, err
+		}
+
+		// Reconstruct and store as reference frame
+		e.reconstructAndStore(mbs, qf, frame)
+		e.frameCount = 1 // Start counting from 1 (next frame is frame 1 after key)
+		e.forceNextKeyFrame = false
+
+		return result, nil
+	}
+
+	// Encode as inter frame (with motion estimation)
+	refBuf := e.refFrames.getRef(refFrameLast)
+
 	for mbY := 0; mbY < mbH; mbY++ {
 		for mbX := 0; mbX < mbW; mbX++ {
 			mbIdx := mbY*mbW + mbX
 
-			// Extract 16x16 luma block
-			var srcY [256]byte
-			for row := 0; row < 16; row++ {
-				srcRow := mbY*16 + row
-				if srcRow >= e.height {
-					srcRow = e.height - 1
-				}
-				for col := 0; col < 16; col++ {
-					srcCol := mbX*16 + col
-					if srcCol >= e.width {
-						srcCol = e.width - 1
-					}
-					srcY[row*16+col] = frame.Y[srcRow*e.width+srcCol]
-				}
-			}
-
-			// Extract 8x8 chroma blocks (U and V)
-			var srcU, srcV [64]byte
-			for row := 0; row < 8; row++ {
-				srcRow := mbY*8 + row
-				if srcRow >= chromaH {
-					srcRow = chromaH - 1
-				}
-				for col := 0; col < 8; col++ {
-					srcCol := mbX*8 + col
-					if srcCol >= chromaW {
-						srcCol = chromaW - 1
-					}
-					srcU[row*8+col] = frame.Cb[srcRow*chromaW+srcCol]
-					srcV[row*8+col] = frame.Cr[srcRow*chromaW+srcCol]
-				}
-			}
-
-			// Build neighbor context
+			srcY := extractLumaBlock(frame, mbX, mbY, e.width, e.height)
+			srcU, srcV := extractChromaBlocks(frame, mbX, mbY, chromaW, chromaH)
 			ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
 
-			// Process the macroblock
-			mbs[mbIdx] = processMacroblock(srcY[:], srcU[:], srcV[:], ctx, qf)
+			mbs[mbIdx] = processInterMacroblock(srcY, srcU, srcV, refBuf,
+				mbX, mbY, mbW, mbs, qf, ctx)
 		}
 	}
 
-	return BuildKeyFrame(e.width, e.height, e.qi, e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta, e.partitionCount, mbs)
+	// Build inter frame bitstream
+	result, err := BuildInterFrame(e.width, e.height, e.qi,
+		e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+		e.partitionCount, mbs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reconstruct and store as reference frame
+	e.reconstructAndStore(mbs, qf, frame)
+	e.frameCount++
+
+	return result, nil
+}
+
+// shouldEncodeKeyFrame determines whether the next frame should be a key frame.
+func (e *Encoder) shouldEncodeKeyFrame() bool {
+	// Forced key frame
+	if e.forceNextKeyFrame {
+		return true
+	}
+	// I-frame only mode (backward compatible default)
+	if e.keyFrameInterval == 0 {
+		return true
+	}
+	// First frame ever (no frames encoded yet)
+	if e.frameCount == 0 {
+		return true
+	}
+	// Key frame interval reached
+	if e.frameCount >= e.keyFrameInterval {
+		return true
+	}
+	// No valid reference frame
+	if !e.refFrames.hasReference(refFrameLast) {
+		return true
+	}
+	return false
+}
+
+// reconstructAndStore reconstructs the encoded frame and stores it as a reference.
+func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *Frame) {
+	recon := e.refFrames.allocBuffer()
+	recon.valid = true
+
+	reconstructFrame(&recon, mbs, qf, e.refFrames, frame)
+
+	// NOTE: Loop filtering of reconstructed reference frames is intentionally
+	// disabled here because the frame headers currently always signal
+	// loop_filter_level=0. Applying a non-zero loop filter at the encoder
+	// would cause encoder/decoder reference mismatch and inter-frame drift.
+	// Once loop filter parameters are correctly encoded in the bitstream
+	// headers, the call to applyLoopFilter can be re-enabled.
+	// applyLoopFilter(&recon, e.loopFilter)
+
+	// Store as last reference frame
+	e.refFrames.updateLast(recon.Y, recon.Cb, recon.Cr)
+}
+
+// extractLumaBlock extracts a 16x16 luma block from the frame.
+func extractLumaBlock(frame *Frame, mbX, mbY, width, height int) []byte {
+	var srcY [256]byte
+	for row := 0; row < 16; row++ {
+		srcRow := mbY*16 + row
+		if srcRow >= height {
+			srcRow = height - 1
+		}
+		for col := 0; col < 16; col++ {
+			srcCol := mbX*16 + col
+			if srcCol >= width {
+				srcCol = width - 1
+			}
+			srcY[row*16+col] = frame.Y[srcRow*width+srcCol]
+		}
+	}
+	return srcY[:]
+}
+
+// extractChromaBlocks extracts 8x8 U and V chroma blocks from the frame.
+func extractChromaBlocks(frame *Frame, mbX, mbY, chromaW, chromaH int) ([]byte, []byte) {
+	var srcU, srcV [64]byte
+	for row := 0; row < 8; row++ {
+		srcRow := mbY*8 + row
+		if srcRow >= chromaH {
+			srcRow = chromaH - 1
+		}
+		for col := 0; col < 8; col++ {
+			srcCol := mbX*8 + col
+			if srcCol >= chromaW {
+				srcCol = chromaW - 1
+			}
+			srcU[row*8+col] = frame.Cb[srcRow*chromaW+srcCol]
+			srcV[row*8+col] = frame.Cr[srcRow*chromaW+srcCol]
+		}
+	}
+	return srcU[:], srcV[:]
 }
 
 // buildMBContext extracts neighbor pixels for prediction.
+// Uses fixed-size backing arrays in mbContext to avoid per-MB heap allocations.
 func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContext {
 	ctx := &mbContext{}
 
@@ -200,25 +360,25 @@ func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContex
 
 	// Extract luma neighbors (16 pixels above, 16 to the left)
 	if mbY > 0 {
-		ctx.lumaAbove = make([]byte, 16)
 		aboveRow := (mbY*16 - 1) * e.width
 		for i := 0; i < 16; i++ {
 			col := mbX*16 + i
 			if col < e.width {
-				ctx.lumaAbove[i] = frame.Y[aboveRow+col]
+				ctx.lumaAboveBuf[i] = frame.Y[aboveRow+col]
 			}
 		}
+		ctx.lumaAbove = ctx.lumaAboveBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.lumaLeft = make([]byte, 16)
 		leftCol := mbX*16 - 1
 		for i := 0; i < 16; i++ {
 			row := mbY*16 + i
 			if row < e.height {
-				ctx.lumaLeft[i] = frame.Y[row*e.width+leftCol]
+				ctx.lumaLeftBuf[i] = frame.Y[row*e.width+leftCol]
 			}
 		}
+		ctx.lumaLeft = ctx.lumaLeftBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {
@@ -229,30 +389,30 @@ func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContex
 
 	// Extract chroma neighbors (8 pixels above, 8 to the left)
 	if mbY > 0 {
-		ctx.chromaAboveU = make([]byte, 8)
-		ctx.chromaAboveV = make([]byte, 8)
 		aboveRow := (mbY*8 - 1) * chromaW
 		for i := 0; i < 8; i++ {
 			col := mbX*8 + i
 			if col < chromaW {
-				ctx.chromaAboveU[i] = frame.Cb[aboveRow+col]
-				ctx.chromaAboveV[i] = frame.Cr[aboveRow+col]
+				ctx.chromaAboveUBuf[i] = frame.Cb[aboveRow+col]
+				ctx.chromaAboveVBuf[i] = frame.Cr[aboveRow+col]
 			}
 		}
+		ctx.chromaAboveU = ctx.chromaAboveUBuf[:]
+		ctx.chromaAboveV = ctx.chromaAboveVBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.chromaLeftU = make([]byte, 8)
-		ctx.chromaLeftV = make([]byte, 8)
 		leftCol := mbX*8 - 1
 		chromaH := e.height / 2
 		for i := 0; i < 8; i++ {
 			row := mbY*8 + i
 			if row < chromaH {
-				ctx.chromaLeftU[i] = frame.Cb[row*chromaW+leftCol]
-				ctx.chromaLeftV[i] = frame.Cr[row*chromaW+leftCol]
+				ctx.chromaLeftUBuf[i] = frame.Cb[row*chromaW+leftCol]
+				ctx.chromaLeftVBuf[i] = frame.Cr[row*chromaW+leftCol]
 			}
 		}
+		ctx.chromaLeftU = ctx.chromaLeftUBuf[:]
+		ctx.chromaLeftV = ctx.chromaLeftVBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {

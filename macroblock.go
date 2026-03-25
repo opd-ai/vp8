@@ -13,12 +13,25 @@ type macroblock struct {
 	// Layout: 16 blocks in raster order (row-major, left-to-right, top-to-bottom).
 	bModes [16]intraBMode
 
+	// Inter-frame prediction fields.
+	// isInter indicates this macroblock uses inter-frame prediction.
+	isInter bool
+	// refFrame indicates which reference frame is used for inter prediction.
+	refFrame refFrameType
+	// mv is the motion vector for inter prediction (quarter-pel precision).
+	mv motionVector
+	// predMV is the predicted motion vector derived from neighboring macroblocks.
+	// Used as the base for delta-coding the MV in NEWMV mode.
+	predMV motionVector
+	// interMode is the inter prediction mode (NEARESTMV, NEARMV, ZEROMV, NEWMV).
+	interMode interMode
+
 	// yCoeffs holds the quantized DCT coefficients for the 16 Y (luma) 4x4 blocks.
 	// Each block has 16 coefficients in zigzag order.
 	yCoeffs [16][16]int16
 
 	// y2Coeffs holds the quantized WHT coefficients for the Y2 (DC-of-DC) block.
-	// Used for 16x16 prediction modes (not B_PRED).
+	// Used for 16x16 prediction modes (not B_PRED) and inter modes.
 	y2Coeffs [16]int16
 
 	// uCoeffs holds the quantized DCT coefficients for the 4 U chroma 4x4 blocks.
@@ -30,14 +43,20 @@ type macroblock struct {
 
 // mbContext holds the neighbor context needed for macroblock prediction.
 type mbContext struct {
-	// Luma neighbors
-	lumaAbove   []byte // 16 pixels above
-	lumaLeft    []byte // 16 pixels to the left
-	lumaTopLeft byte   // pixel at (-1, -1)
+	// Luma neighbors — fixed-size backing arrays to avoid per-MB heap allocations.
+	lumaAboveBuf   [16]byte
+	lumaLeftBuf    [16]byte
+	lumaAbove      []byte // 16 pixels above (nil if not available, else slice of lumaAboveBuf)
+	lumaLeft       []byte // 16 pixels to the left (nil if not available, else slice of lumaLeftBuf)
+	lumaTopLeft    byte   // pixel at (-1, -1)
 
-	// Chroma neighbors (8x8 for each U/V)
-	chromaAboveU   []byte
-	chromaLeftU    []byte
+	// Chroma neighbors (8x8 for each U/V) — fixed-size backing arrays.
+	chromaAboveUBuf [8]byte
+	chromaAboveVBuf [8]byte
+	chromaLeftUBuf  [8]byte
+	chromaLeftVBuf  [8]byte
+	chromaAboveU    []byte
+	chromaLeftU     []byte
 	chromaTopLeftU byte
 	chromaAboveV   []byte
 	chromaLeftV    []byte
