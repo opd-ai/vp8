@@ -300,8 +300,13 @@ func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *
 
 	reconstructFrame(&recon, mbs, qf, e.refFrames, frame)
 
-	// Apply loop filter to the reconstructed frame
-	applyLoopFilter(&recon, e.loopFilter)
+	// NOTE: Loop filtering of reconstructed reference frames is intentionally
+	// disabled here because the frame headers currently always signal
+	// loop_filter_level=0. Applying a non-zero loop filter at the encoder
+	// would cause encoder/decoder reference mismatch and inter-frame drift.
+	// Once loop filter parameters are correctly encoded in the bitstream
+	// headers, the call to applyLoopFilter can be re-enabled.
+	// applyLoopFilter(&recon, e.loopFilter)
 
 	// Store as last reference frame
 	e.refFrames.updateLast(recon.Y, recon.Cb, recon.Cr)
@@ -347,6 +352,7 @@ func extractChromaBlocks(frame *Frame, mbX, mbY, chromaW, chromaH int) ([]byte, 
 }
 
 // buildMBContext extracts neighbor pixels for prediction.
+// Uses fixed-size backing arrays in mbContext to avoid per-MB heap allocations.
 func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContext {
 	ctx := &mbContext{}
 
@@ -354,25 +360,25 @@ func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContex
 
 	// Extract luma neighbors (16 pixels above, 16 to the left)
 	if mbY > 0 {
-		ctx.lumaAbove = make([]byte, 16)
 		aboveRow := (mbY*16 - 1) * e.width
 		for i := 0; i < 16; i++ {
 			col := mbX*16 + i
 			if col < e.width {
-				ctx.lumaAbove[i] = frame.Y[aboveRow+col]
+				ctx.lumaAboveBuf[i] = frame.Y[aboveRow+col]
 			}
 		}
+		ctx.lumaAbove = ctx.lumaAboveBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.lumaLeft = make([]byte, 16)
 		leftCol := mbX*16 - 1
 		for i := 0; i < 16; i++ {
 			row := mbY*16 + i
 			if row < e.height {
-				ctx.lumaLeft[i] = frame.Y[row*e.width+leftCol]
+				ctx.lumaLeftBuf[i] = frame.Y[row*e.width+leftCol]
 			}
 		}
+		ctx.lumaLeft = ctx.lumaLeftBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {
@@ -383,30 +389,30 @@ func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContex
 
 	// Extract chroma neighbors (8 pixels above, 8 to the left)
 	if mbY > 0 {
-		ctx.chromaAboveU = make([]byte, 8)
-		ctx.chromaAboveV = make([]byte, 8)
 		aboveRow := (mbY*8 - 1) * chromaW
 		for i := 0; i < 8; i++ {
 			col := mbX*8 + i
 			if col < chromaW {
-				ctx.chromaAboveU[i] = frame.Cb[aboveRow+col]
-				ctx.chromaAboveV[i] = frame.Cr[aboveRow+col]
+				ctx.chromaAboveUBuf[i] = frame.Cb[aboveRow+col]
+				ctx.chromaAboveVBuf[i] = frame.Cr[aboveRow+col]
 			}
 		}
+		ctx.chromaAboveU = ctx.chromaAboveUBuf[:]
+		ctx.chromaAboveV = ctx.chromaAboveVBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.chromaLeftU = make([]byte, 8)
-		ctx.chromaLeftV = make([]byte, 8)
 		leftCol := mbX*8 - 1
 		chromaH := e.height / 2
 		for i := 0; i < 8; i++ {
 			row := mbY*8 + i
 			if row < chromaH {
-				ctx.chromaLeftU[i] = frame.Cb[row*chromaW+leftCol]
-				ctx.chromaLeftV[i] = frame.Cr[row*chromaW+leftCol]
+				ctx.chromaLeftUBuf[i] = frame.Cb[row*chromaW+leftCol]
+				ctx.chromaLeftVBuf[i] = frame.Cr[row*chromaW+leftCol]
 			}
 		}
+		ctx.chromaLeftU = ctx.chromaLeftUBuf[:]
+		ctx.chromaLeftV = ctx.chromaLeftVBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {

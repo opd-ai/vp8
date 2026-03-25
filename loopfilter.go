@@ -16,8 +16,6 @@ type loopFilterParams struct {
 	level int
 	// sharpness limits filter strength at block boundaries (0–7).
 	sharpness int
-	// simple selects simple (true) vs normal (false) filter type.
-	simple bool
 }
 
 // applyLoopFilter applies the VP8 simple loop filter to a reconstructed frame.

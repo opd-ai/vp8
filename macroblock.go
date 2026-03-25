@@ -20,6 +20,9 @@ type macroblock struct {
 	refFrame refFrameType
 	// mv is the motion vector for inter prediction (quarter-pel precision).
 	mv motionVector
+	// predMV is the predicted motion vector derived from neighboring macroblocks.
+	// Used as the base for delta-coding the MV in NEWMV mode.
+	predMV motionVector
 	// interMode is the inter prediction mode (NEARESTMV, NEARMV, ZEROMV, NEWMV).
 	interMode interMode
 
@@ -40,14 +43,20 @@ type macroblock struct {
 
 // mbContext holds the neighbor context needed for macroblock prediction.
 type mbContext struct {
-	// Luma neighbors
-	lumaAbove   []byte // 16 pixels above
-	lumaLeft    []byte // 16 pixels to the left
-	lumaTopLeft byte   // pixel at (-1, -1)
+	// Luma neighbors — fixed-size backing arrays to avoid per-MB heap allocations.
+	lumaAboveBuf   [16]byte
+	lumaLeftBuf    [16]byte
+	lumaAbove      []byte // 16 pixels above (nil if not available, else slice of lumaAboveBuf)
+	lumaLeft       []byte // 16 pixels to the left (nil if not available, else slice of lumaLeftBuf)
+	lumaTopLeft    byte   // pixel at (-1, -1)
 
-	// Chroma neighbors (8x8 for each U/V)
-	chromaAboveU   []byte
-	chromaLeftU    []byte
+	// Chroma neighbors (8x8 for each U/V) — fixed-size backing arrays.
+	chromaAboveUBuf [8]byte
+	chromaAboveVBuf [8]byte
+	chromaLeftUBuf  [8]byte
+	chromaLeftVBuf  [8]byte
+	chromaAboveU    []byte
+	chromaLeftU     []byte
 	chromaTopLeftU byte
 	chromaAboveV   []byte
 	chromaLeftV    []byte

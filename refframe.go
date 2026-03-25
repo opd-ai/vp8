@@ -214,30 +214,31 @@ func reconstructIntraMB(recon *refFrameBuffer, mb *macroblock, mbX, mbY, width, 
 }
 
 // buildReconContext builds neighbor context from the reconstructed frame buffer.
+// Uses fixed-size backing arrays in mbContext to avoid per-MB heap allocations.
 func buildReconContext(recon *refFrameBuffer, mbX, mbY, width, height, chromaW int) *mbContext {
 	ctx := &mbContext{}
 	chromaH := height / 2
 
 	if mbY > 0 {
-		ctx.lumaAbove = make([]byte, 16)
 		aboveRow := mbY*16 - 1
 		for i := 0; i < 16; i++ {
 			col := mbX*16 + i
 			if col < width {
-				ctx.lumaAbove[i] = recon.Y[aboveRow*width+col]
+				ctx.lumaAboveBuf[i] = recon.Y[aboveRow*width+col]
 			}
 		}
+		ctx.lumaAbove = ctx.lumaAboveBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.lumaLeft = make([]byte, 16)
 		leftCol := mbX*16 - 1
 		for i := 0; i < 16; i++ {
 			row := mbY*16 + i
 			if row < height {
-				ctx.lumaLeft[i] = recon.Y[row*width+leftCol]
+				ctx.lumaLeftBuf[i] = recon.Y[row*width+leftCol]
 			}
 		}
+		ctx.lumaLeft = ctx.lumaLeftBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {
@@ -247,29 +248,29 @@ func buildReconContext(recon *refFrameBuffer, mbX, mbY, width, height, chromaW i
 	}
 
 	if mbY > 0 {
-		ctx.chromaAboveU = make([]byte, 8)
-		ctx.chromaAboveV = make([]byte, 8)
 		aboveRow := mbY*8 - 1
 		for i := 0; i < 8; i++ {
 			col := mbX*8 + i
 			if col < chromaW {
-				ctx.chromaAboveU[i] = recon.Cb[aboveRow*chromaW+col]
-				ctx.chromaAboveV[i] = recon.Cr[aboveRow*chromaW+col]
+				ctx.chromaAboveUBuf[i] = recon.Cb[aboveRow*chromaW+col]
+				ctx.chromaAboveVBuf[i] = recon.Cr[aboveRow*chromaW+col]
 			}
 		}
+		ctx.chromaAboveU = ctx.chromaAboveUBuf[:]
+		ctx.chromaAboveV = ctx.chromaAboveVBuf[:]
 	}
 
 	if mbX > 0 {
-		ctx.chromaLeftU = make([]byte, 8)
-		ctx.chromaLeftV = make([]byte, 8)
 		leftCol := mbX*8 - 1
 		for i := 0; i < 8; i++ {
 			row := mbY*8 + i
 			if row < chromaH {
-				ctx.chromaLeftU[i] = recon.Cb[row*chromaW+leftCol]
-				ctx.chromaLeftV[i] = recon.Cr[row*chromaW+leftCol]
+				ctx.chromaLeftUBuf[i] = recon.Cb[row*chromaW+leftCol]
+				ctx.chromaLeftVBuf[i] = recon.Cr[row*chromaW+leftCol]
 			}
 		}
+		ctx.chromaLeftU = ctx.chromaLeftUBuf[:]
+		ctx.chromaLeftV = ctx.chromaLeftVBuf[:]
 	}
 
 	if mbX > 0 && mbY > 0 {

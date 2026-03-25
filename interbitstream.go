@@ -157,12 +157,12 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 
 	// If NEWMV, encode the motion vector difference
 	if mb.interMode == mvModeNewMV {
-		// The MV is encoded as delta from the "best" predicted MV (nearest)
-		// For simplicity, use zero as the prediction base; actual encoding
-		// should use nearest MV from neighbors.
-		// Note: The actual prediction is handled by the caller setting up
-		// the appropriate predMV, but for the bitstream we encode the full MV.
-		encodeMV(enc, mb.mv, zeroMV)
+		// The MV must be encoded as delta from the predicted MV (typically
+		// derived from neighboring macroblocks), so that the decoder, which
+		// uses the same predictor, reconstructs the correct absolute MV.
+		// The caller is responsible for setting mb.predMV to the chosen
+		// predictor during inter processing.
+		encodeMV(enc, mb.mv, mb.predMV)
 	}
 }
 

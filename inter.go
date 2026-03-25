@@ -43,14 +43,14 @@ func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
 	// Inter mode cost includes MV coding overhead
 	interCost := meResult.sad + mvCost(meResult.mv, nearestMV)
 
-	// Choose between inter and intra mode
-	// Use a bias toward inter mode since it typically provides better compression
-	// for temporal prediction
+	// Choose between inter and intra mode based on the estimated costs.
+	// Inter mode cost already includes motion vector coding overhead.
 	if interCost < intraSAD {
 		// Inter mode wins
 		mb.isInter = true
 		mb.refFrame = refFrameLast
 		mb.mv = meResult.mv
+		mb.predMV = nearestMV // Store predicted MV for delta-coding in bitstream
 		mb.interMode = meResult.mode
 
 		// Compute motion-compensated prediction

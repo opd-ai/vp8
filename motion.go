@@ -23,6 +23,26 @@ func mvEqual(a, b motionVector) bool {
 	return a.dx == b.dx && a.dy == b.dy
 }
 
+// snapMVTo2Pel snaps a motion vector to the nearest 2-pixel grid
+// (multiples of 8 quarter-pixel units). This ensures that chroma MVs
+// derived by halving the luma MV always land on integer-pixel positions,
+// avoiding encoder/decoder mismatch from sub-pel truncation.
+func snapMVTo2Pel(mv motionVector) motionVector {
+	return motionVector{
+		dx: snapComponentTo2Pel(mv.dx),
+		dy: snapComponentTo2Pel(mv.dy),
+	}
+}
+
+// snapComponentTo2Pel rounds a single MV component to the nearest
+// multiple of 8 quarter-pixel units. Handles negative values correctly.
+func snapComponentTo2Pel(v int16) int16 {
+	if v >= 0 {
+		return ((v + 4) / 8) * 8
+	}
+	return -((-v + 4) / 8) * 8
+}
+
 // interMode represents the VP8 inter-frame macroblock prediction mode.
 type interMode uint8
 
@@ -61,12 +81,16 @@ type motionEstimateResult struct {
 //
 // Returns the best motion vector and its SAD cost.
 func estimateMotion(srcY []byte, ref []byte, refW, refH, mbX, mbY int, predMV motionVector) motionEstimateResult {
-	// Start with the predicted MV
-	bestMV := predMV
-	bestSAD := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, predMV)
+	// Snap predicted MV to 2-pel grid (multiples of 8 qpel) so that
+	// chroma MVs (halved from luma) always land on integer pixels.
+	snappedPred := snapMVTo2Pel(predMV)
+
+	// Start with the snapped predicted MV
+	bestMV := snappedPred
+	bestSAD := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, snappedPred)
 
 	// Also evaluate zero MV
-	if !mvEqual(predMV, zeroMV) {
+	if !mvEqual(snappedPred, zeroMV) {
 		zeroSAD := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, zeroMV)
 		if zeroSAD < bestSAD {
 			bestMV = zeroMV
@@ -74,7 +98,7 @@ func estimateMotion(srcY []byte, ref []byte, refW, refH, mbX, mbY int, predMV mo
 		}
 	}
 
-	// Diamond search around the best initial point
+	// Diamond search around the best initial point (all steps are 2-pel)
 	bestMV, bestSAD = diamondSearch(srcY, ref, refW, refH, mbX, mbY, bestMV, bestSAD)
 
 	// Determine the inter mode based on the selected MV
@@ -94,16 +118,21 @@ func estimateMotion(srcY []byte, ref []byte, refW, refH, mbX, mbY int, predMV mo
 // diamondSearch performs a diamond search pattern to refine a motion vector.
 // It iteratively evaluates neighboring positions in a diamond pattern,
 // moving to the best position until no improvement is found.
+//
+// All search offsets are multiples of 8 quarter-pixel units (2 full pixels)
+// to ensure that chroma MVs (halved from luma) remain at integer-pel precision,
+// avoiding encoder/decoder mismatch from sub-pel truncation.
 func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVector, startSAD int) (motionVector, int) {
-	// Large diamond pattern offsets (in quarter-pixel units: 4 qpel = 1 pixel)
+	// Large diamond pattern offsets (in quarter-pixel units: 8 qpel = 2 pixels)
+	// Using 2-pixel steps ensures chroma MV (luma MV / 2) is always integer-pel.
 	largeDiamond := [8]motionVector{
-		{0, -4}, {0, 4}, {-4, 0}, {4, 0},
-		{-4, -4}, {4, -4}, {-4, 4}, {4, 4},
+		{0, -8}, {0, 8}, {-8, 0}, {8, 0},
+		{-8, -8}, {8, -8}, {-8, 8}, {8, 8},
 	}
 
-	// Small diamond pattern offsets
+	// Small diamond pattern offsets (2-pixel steps)
 	smallDiamond := [4]motionVector{
-		{0, -4}, {0, 4}, {-4, 0}, {4, 0},
+		{0, -8}, {0, 8}, {-8, 0}, {8, 0},
 	}
 
 	bestMV := startMV

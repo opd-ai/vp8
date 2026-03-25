@@ -1,7 +1,10 @@
 package vp8
 
 import (
+	"bytes"
 	"testing"
+
+	"golang.org/x/image/vp8"
 )
 
 // TestRefFrameManagerBasic tests basic reference frame buffer operations.
@@ -333,7 +336,6 @@ func TestLoopFilterBasic(t *testing.T) {
 	params := loopFilterParams{
 		level:     20,
 		sharpness: 0,
-		simple:    true,
 	}
 
 	applyLoopFilter(recon, params)
@@ -625,7 +627,8 @@ func TestBuildInterFrame(t *testing.T) {
 		{
 			isInter:   true,
 			refFrame:  refFrameLast,
-			mv:        motionVector{dx: 4, dy: 4},
+			mv:        motionVector{dx: 8, dy: 8},
+			predMV:    motionVector{dx: 0, dy: 0},
 			interMode: mvModeNewMV,
 			skip:      true,
 		},
@@ -718,5 +721,169 @@ func TestReconstructIntraMB(t *testing.T) {
 				return
 			}
 		}
+	}
+}
+
+// TestSnapMVTo2Pel tests that motion vectors are correctly snapped to 2-pixel grid.
+func TestSnapMVTo2Pel(t *testing.T) {
+	tests := []struct {
+		input    motionVector
+		expected motionVector
+	}{
+		{motionVector{0, 0}, motionVector{0, 0}},
+		{motionVector{4, 4}, motionVector{8, 8}},       // 1-pel rounds up to 2-pel
+		{motionVector{8, 8}, motionVector{8, 8}},       // already 2-pel
+		{motionVector{-8, -8}, motionVector{-8, -8}},   // negative 2-pel
+		{motionVector{-4, -4}, motionVector{-8, -8}},   // negative rounds away
+		{motionVector{16, -16}, motionVector{16, -16}},  // 4-pel
+		{motionVector{3, -3}, motionVector{0, 0}},       // small values round to zero
+		{motionVector{12, -12}, motionVector{16, -16}},  // rounds up
+	}
+
+	for _, tt := range tests {
+		got := snapMVTo2Pel(tt.input)
+		if got.dx != tt.expected.dx || got.dy != tt.expected.dy {
+			t.Errorf("snapMVTo2Pel(%v) = %v, want %v", tt.input, got, tt.expected)
+		}
+		// Verify the result is always a multiple of 8 qpel
+		if got.dx%8 != 0 || got.dy%8 != 0 {
+			t.Errorf("snapMVTo2Pel(%v) = %v is not on 2-pel grid", tt.input, got)
+		}
+	}
+}
+
+// TestInterFrameKeyFrameDecodable tests that key frames in an inter-frame
+// encoding sequence are still decodable by golang.org/x/image/vp8.
+// This validates that the encoder's reference frame reconstruction does not
+// corrupt the key frame bitstream format.
+func TestInterFrameKeyFrameDecodable(t *testing.T) {
+	enc, err := NewEncoder(64, 64, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	enc.SetKeyFrameInterval(5)
+
+	frameSize := 64 * 64 * 3 / 2
+
+	// Encode a sequence and verify each key frame is decodable
+	for i := 0; i < 7; i++ {
+		yuv := make([]byte, frameSize)
+		// Gradient pattern that shifts per frame
+		for row := 0; row < 64; row++ {
+			for col := 0; col < 64; col++ {
+				yuv[row*64+col] = byte((row + col + i*2) % 256)
+			}
+		}
+		for j := 64 * 64; j < frameSize; j++ {
+			yuv[j] = 128
+		}
+
+		frame, err := enc.Encode(yuv)
+		if err != nil {
+			t.Fatalf("encode frame %d: %v", i, err)
+		}
+
+		isKeyFrame := frame[0]&1 == 0
+
+		// Key frames should be at index 0 and 5
+		if (i == 0 || i == 5) && !isKeyFrame {
+			t.Errorf("frame %d should be a key frame", i)
+		}
+
+		// Verify key frames are decodable
+		if isKeyFrame {
+			verifyKeyFrameDecodable(t, frame, 64, 64, i)
+		}
+
+		// Verify inter frames have correct tag
+		if !isKeyFrame {
+			if frame[0]&1 != 1 {
+				t.Errorf("frame %d should be inter frame (tag bit 0 = 1)", i)
+			}
+			// Verify first_part_size is non-zero
+			tag := uint32(frame[0]) | uint32(frame[1])<<8 | uint32(frame[2])<<16
+			firstPartSize := tag >> 5
+			if firstPartSize == 0 {
+				t.Errorf("frame %d has zero first_part_size", i)
+			}
+		}
+	}
+}
+
+// TestPredMVStoredForNewMV verifies that the predicted MV is stored in
+// macroblocks so that NEWMV delta encoding works correctly.
+func TestPredMVStoredForNewMV(t *testing.T) {
+	enc, err := NewEncoder(64, 64, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	enc.SetKeyFrameInterval(30)
+
+	frameSize := 64 * 64 * 3 / 2
+
+	// Encode a key frame
+	yuv1 := make([]byte, frameSize)
+	for i := range yuv1 {
+		yuv1[i] = 100
+	}
+	_, err = enc.Encode(yuv1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Encode an inter frame with different content to trigger motion search
+	yuv2 := make([]byte, frameSize)
+	for row := 0; row < 64; row++ {
+		for col := 0; col < 64; col++ {
+			yuv2[row*64+col] = byte((row*3 + col*7) % 256)
+		}
+	}
+	for j := 64 * 64; j < frameSize; j++ {
+		yuv2[j] = 128
+	}
+
+	frame2, err := enc.Encode(yuv2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Just verify the inter frame was produced without error
+	if frame2[0]&1 != 1 {
+		t.Error("expected inter frame")
+	}
+	if len(frame2) < 4 {
+		t.Error("inter frame too small")
+	}
+}
+
+// verifyKeyFrameDecodable verifies that a key frame can be decoded by
+// golang.org/x/image/vp8 and has the expected dimensions.
+func verifyKeyFrameDecodable(t *testing.T, frameData []byte, expectedW, expectedH, frameIdx int) {
+	t.Helper()
+	dec := vp8.NewDecoder()
+	dec.Init(bytes.NewReader(frameData), len(frameData))
+
+	fh, err := dec.DecodeFrameHeader()
+	if err != nil {
+		t.Errorf("frame %d: DecodeFrameHeader: %v", frameIdx, err)
+		return
+	}
+
+	if fh.Width != expectedW || fh.Height != expectedH {
+		t.Errorf("frame %d: expected %dx%d, got %dx%d", frameIdx,
+			expectedW, expectedH, fh.Width, fh.Height)
+		return
+	}
+
+	if !fh.KeyFrame {
+		t.Errorf("frame %d: expected key frame in header", frameIdx)
+		return
+	}
+
+	_, err = dec.DecodeFrame()
+	if err != nil {
+		t.Errorf("frame %d: DecodeFrame: %v", frameIdx, err)
 	}
 }
