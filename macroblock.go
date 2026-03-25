@@ -13,12 +13,22 @@ type macroblock struct {
 	// Layout: 16 blocks in raster order (row-major, left-to-right, top-to-bottom).
 	bModes [16]intraBMode
 
+	// Inter-frame prediction fields.
+	// isInter indicates this macroblock uses inter-frame prediction.
+	isInter bool
+	// refFrame indicates which reference frame is used for inter prediction.
+	refFrame refFrameType
+	// mv is the motion vector for inter prediction (quarter-pel precision).
+	mv motionVector
+	// interMode is the inter prediction mode (NEARESTMV, NEARMV, ZEROMV, NEWMV).
+	interMode interMode
+
 	// yCoeffs holds the quantized DCT coefficients for the 16 Y (luma) 4x4 blocks.
 	// Each block has 16 coefficients in zigzag order.
 	yCoeffs [16][16]int16
 
 	// y2Coeffs holds the quantized WHT coefficients for the Y2 (DC-of-DC) block.
-	// Used for 16x16 prediction modes (not B_PRED).
+	// Used for 16x16 prediction modes (not B_PRED) and inter modes.
 	y2Coeffs [16]int16
 
 	// uCoeffs holds the quantized DCT coefficients for the 4 U chroma 4x4 blocks.
