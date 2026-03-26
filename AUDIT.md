@@ -54,11 +54,11 @@ No critical findings. Core encoding functionality is operational.
 
 ### HIGH
 
-- [ ] **Loop filter disabled despite API** — `encoder.go:309` — The `SetLoopFilterLevel()` API accepts values but loop filtering is commented out with `// applyLoopFilter(&recon, e.loopFilter)`. The code comment explains this is intentional because "the frame headers currently always signal loop_filter_level=0" which would cause encoder/decoder mismatch. — **Remediation:** In `bitstream.go:67`, change `enc.putLiteral(0, 6)` to emit the configured `loopFilter.level` value, then uncomment `applyLoopFilter` in `encoder.go:309`. Validation: `go test -race ./... && go run ... | decode_with_ffmpeg`
+- [x] **Loop filter disabled despite API** — `encoder.go:309` — The `SetLoopFilterLevel()` API accepts values but loop filtering is commented out with `// applyLoopFilter(&recon, e.loopFilter)`. The code comment explains this is intentional because "the frame headers currently always signal loop_filter_level=0" which would cause encoder/decoder mismatch. — **Remediation:** In `bitstream.go:67`, change `enc.putLiteral(0, 6)` to emit the configured `loopFilter.level` value, then uncomment `applyLoopFilter` in `encoder.go:309`. Validation: `go test -race ./... && go run ... | decode_with_ffmpeg`
 
 - [ ] **B_PRED mode never used** — `macroblock.go:72` — The `bPredSADThreshold` constant is set to 0, disabling B_PRED mode selection entirely. A TODO comment at `macroblock.go:70` notes "B_PRED encoding has a bitstream issue causing decode failures." — **Remediation:** Debug bitstream encoding in `bitstream.go:137-142` (`encodeBPredModes`) and `bitstream.go:129-144` (`encodeYMode`). Set `bPredSADThreshold = 90` once fixed. Validation: Create test with high-detail content showing B_PRED selection, verify decode succeeds.
 
-- [ ] **Code duplication in bitstream encoding** — `bitstream.go:585-645` and `bitstream.go:757-819` — 61-line duplicate code block in `encodeResidualPartition` and `encodeResidualMultiPartition`. — **Remediation:** Extract common residual encoding logic into a shared helper function. Validation: `go test -race ./... && go-stats-generator analyze . --format json | jq '.duplication.duplication_ratio'`
+- [x] **Code duplication in bitstream encoding** — `bitstream.go:585-645` and `bitstream.go:757-819` — 61-line duplicate code block in `encodeResidualPartition` and `encodeResidualMultiPartition`. — **Remediation:** Extract common residual encoding logic into a shared helper function. Validation: `go test -race ./... && go-stats-generator analyze . --format json | jq '.duplication.duplication_ratio'`
 
 ### MEDIUM
 
@@ -72,11 +72,11 @@ No critical findings. Core encoding functionality is operational.
 
 ### LOW
 
-- [ ] **Naming convention violations** — `bpred.go:9-27` — Constants `B_DC_PRED`, `B_TM_PRED`, etc. use underscores instead of Go's MixedCaps convention. These match VP8 spec terminology, so deviation is intentional for RFC 6386 alignment. — **Remediation:** No change recommended; add comment explaining RFC 6386 naming.
+- [x] **Naming convention violations** — `bpred.go:9-27` — Constants `B_DC_PRED`, `B_TM_PRED`, etc. use underscores instead of Go's MixedCaps convention. These match VP8 spec terminology, so deviation is intentional for RFC 6386 alignment. — **Remediation:** No change recommended; add comment explaining RFC 6386 naming.
 
-- [ ] **Magic numbers in quantization tables** — `quant.go` — Contains 128 raw numeric values from VP8 spec. — **Remediation:** Add constants or comments referencing RFC 6386 table source. Validation: `grep -c "magic" quant.go` should show reduction.
+- [x] **Magic numbers in quantization tables** — `quant.go` — Contains 128 raw numeric values from VP8 spec. — **Remediation:** Add constants or comments referencing RFC 6386 table source. Validation: `grep -c "magic" quant.go` should show reduction.
 
-- [ ] **Package name mismatch** — Module path is `github.com/opd-ai/vp8` but directory may vary. — **Remediation:** Ensure `go.mod` module path matches import paths.
+- [x] **Package name mismatch** — Module path is `github.com/opd-ai/vp8` but directory may vary. — **Remediation:** Ensure `go.mod` module path matches import paths.
 
 ---
 

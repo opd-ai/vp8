@@ -4,6 +4,9 @@ package vp8
 // Used when the macroblock mode is B_PRED.
 type intraBMode uint8
 
+// VP8 4×4 intra prediction sub-modes as defined in RFC 6386 §12.3.
+// Constants use underscore naming (e.g., B_DC_PRED) to match RFC 6386 terminology,
+// deviating from Go's MixedCaps convention for clarity when referencing the spec.
 const (
 	// B_DC_PRED predicts DC using row above and column to the left.
 	B_DC_PRED intraBMode = iota

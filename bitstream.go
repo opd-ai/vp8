@@ -52,7 +52,7 @@ func encodeDelta(enc *boolEncoder, delta int) {
 // first partition. It encodes the minimum required fields so that a
 // conformant VP8 decoder can parse the bitstream.
 // Reference: RFC 6386, Section 9.2.
-func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas, partCount PartitionCount, numMBs int, mbs []macroblock) {
+func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas, partCount PartitionCount, loopFilter loopFilterParams, numMBs int, mbs []macroblock) {
 	// color_space (1 bit): 0 = BT.601
 	enc.putBit(128, false)
 	// clamping_type (1 bit): 0 = clamped
@@ -64,9 +64,9 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDelt
 	// filter_type (1 bit): 0 = normal (simple filter disabled)
 	enc.putBit(128, false)
 	// loop_filter_level (6 bits)
-	enc.putLiteral(0, 6)
+	enc.putLiteral(uint32(loopFilter.level), 6)
 	// sharpness_level (3 bits)
-	enc.putLiteral(0, 3)
+	enc.putLiteral(uint32(loopFilter.sharpness), 3)
 
 	// mb_no_lf_delta (1 bit): 0
 	enc.putBit(128, false)
@@ -402,6 +402,42 @@ func encodeUVMode(enc *boolEncoder, mode chromaMode) {
 	}
 }
 
+// encodeChromaPlane encodes 4 chroma blocks (2x2) for a single plane (U or V).
+// It returns the new left and up non-zero masks for the encoded plane.
+// The shift parameter determines which bits of the combined UV mask to use
+// (0 for U plane, 2 for V plane).
+func encodeChromaPlane(te *TokenEncoder, coeffs [4][16]int16, leftMask, upMask uint8, shift int) (newLeft, newUp uint8) {
+	var lnz, unz [2]uint8
+	lnz[0] = (leftMask >> (shift + 0)) & 1
+	lnz[1] = (leftMask >> (shift + 1)) & 1
+	unz[0] = (upMask >> (shift + 0)) & 1
+	unz[1] = (upMask >> (shift + 1)) & 1
+
+	for blockY := 0; blockY < 2; blockY++ {
+		nz := lnz[blockY]
+		for blockX := 0; blockX < 2; blockX++ {
+			blockIdx := blockY*2 + blockX
+			ctx := int(nz + unz[blockX])
+			if ctx > 2 {
+				ctx = 2
+			}
+			hasNz := te.EncodeBlockWithContext(coeffs[blockIdx], PlaneUV, 0, ctx)
+			nzVal := uint8(0)
+			if hasNz {
+				nzVal = 1
+			}
+			nz = nzVal
+			unz[blockX] = nzVal
+		}
+		lnz[blockY] = nz
+		newLeft |= nz << blockY
+	}
+	for i := 0; i < 2; i++ {
+		newUp |= unz[i] << i
+	}
+	return newLeft, newUp
+}
+
 // BuildKeyFrame constructs a complete VP8 key-frame bitstream from a
 // processed macroblock slice. It returns the raw VP8 frame bytes suitable
 // for RTP packetisation.
@@ -411,8 +447,9 @@ func encodeUVMode(enc *boolEncoder, mode chromaMode) {
 //   - qi: base quantizer index [0, 127]
 //   - y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta: per-plane quantizer deltas
 //   - partCount: number of DCT partitions (OnePartition, TwoPartitions, etc.)
+//   - loopFilter: loop filter parameters (level and sharpness)
 //   - mbs: processed macroblocks
-func BuildKeyFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int, partCount PartitionCount, mbs []macroblock) ([]byte, error) {
+func BuildKeyFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int, partCount PartitionCount, loopFilter loopFilterParams, mbs []macroblock) ([]byte, error) {
 	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
 		return nil, errInvalidDimensions
 	}
@@ -430,7 +467,7 @@ func BuildKeyFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta
 
 	// Encode first partition (frame header + MB modes).
 	partEnc := newBoolEncoder()
-	encodeFrameHeader(partEnc, width, height, qi, deltas, partCount, len(mbs), mbs)
+	encodeFrameHeader(partEnc, width, height, qi, deltas, partCount, loopFilter, len(mbs), mbs)
 	firstPart := partEnc.flush()
 
 	// Encode residual partitions
@@ -580,69 +617,12 @@ func encodeResidualMultiPartition(pw *PartitionWriter, mbs []macroblock, mbW, mb
 		leftNzMaskY = newLeftNzMaskY
 		upNzMaskY[mbX] = newUpNzMaskY
 
-		// Encode U blocks
-		var lnzUV, unzUV [2]uint8
-		lnzUV[0] = (leftNzMaskUV >> 0) & 1
-		lnzUV[1] = (leftNzMaskUV >> 1) & 1
-		unzUV[0] = (upNzMaskUV[mbX] >> 0) & 1
-		unzUV[1] = (upNzMaskUV[mbX] >> 1) & 1
+		// Encode U and V chroma blocks using shared helper
+		newLeftU, newUpU := encodeChromaPlane(te, mb.uCoeffs, leftNzMaskUV, upNzMaskUV[mbX], 0)
+		newLeftV, newUpV := encodeChromaPlane(te, mb.vCoeffs, leftNzMaskUV, upNzMaskUV[mbX], 2)
 
-		var newLeftNzMaskU, newUpNzMaskU uint8
-		for blockY := 0; blockY < 2; blockY++ {
-			nz := lnzUV[blockY]
-			for blockX := 0; blockX < 2; blockX++ {
-				blockIdx := blockY*2 + blockX
-				ctx := int(nz + unzUV[blockX])
-				if ctx > 2 {
-					ctx = 2
-				}
-				hasNz := te.EncodeBlockWithContext(mb.uCoeffs[blockIdx], PlaneUV, 0, ctx)
-				nzVal := uint8(0)
-				if hasNz {
-					nzVal = 1
-				}
-				nz = nzVal
-				unzUV[blockX] = nzVal
-			}
-			lnzUV[blockY] = nz
-			newLeftNzMaskU |= nz << blockY
-		}
-		for i := 0; i < 2; i++ {
-			newUpNzMaskU |= unzUV[i] << i
-		}
-
-		// Encode V blocks
-		lnzUV[0] = (leftNzMaskUV >> 2) & 1
-		lnzUV[1] = (leftNzMaskUV >> 3) & 1
-		unzUV[0] = (upNzMaskUV[mbX] >> 2) & 1
-		unzUV[1] = (upNzMaskUV[mbX] >> 3) & 1
-
-		var newLeftNzMaskV, newUpNzMaskV uint8
-		for blockY := 0; blockY < 2; blockY++ {
-			nz := lnzUV[blockY]
-			for blockX := 0; blockX < 2; blockX++ {
-				blockIdx := blockY*2 + blockX
-				ctx := int(nz + unzUV[blockX])
-				if ctx > 2 {
-					ctx = 2
-				}
-				hasNz := te.EncodeBlockWithContext(mb.vCoeffs[blockIdx], PlaneUV, 0, ctx)
-				nzVal := uint8(0)
-				if hasNz {
-					nzVal = 1
-				}
-				nz = nzVal
-				unzUV[blockX] = nzVal
-			}
-			lnzUV[blockY] = nz
-			newLeftNzMaskV |= nz << blockY
-		}
-		for i := 0; i < 2; i++ {
-			newUpNzMaskV |= unzUV[i] << i
-		}
-
-		leftNzMaskUV = newLeftNzMaskU | (newLeftNzMaskV << 2)
-		upNzMaskUV[mbX] = newUpNzMaskU | (newUpNzMaskV << 2)
+		leftNzMaskUV = newLeftU | (newLeftV << 2)
+		upNzMaskUV[mbX] = newUpU | (newUpV << 2)
 	}
 }
 
@@ -751,71 +731,11 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 		leftNzMaskY = newLeftNzMaskY
 		upNzMaskY[mbX] = newUpNzMaskY
 
-		// Encode 4 U blocks (plane 2 = PlaneUV)
-		// UV blocks are 2x2 per MB
-		var lnzUV, unzUV [2]uint8
-		lnzUV[0] = (leftNzMaskUV >> 0) & 1
-		lnzUV[1] = (leftNzMaskUV >> 1) & 1
-		unzUV[0] = (upNzMaskUV[mbX] >> 0) & 1
-		unzUV[1] = (upNzMaskUV[mbX] >> 1) & 1
+		// Encode U and V chroma blocks using shared helper
+		newLeftU, newUpU := encodeChromaPlane(te, mb.uCoeffs, leftNzMaskUV, upNzMaskUV[mbX], 0)
+		newLeftV, newUpV := encodeChromaPlane(te, mb.vCoeffs, leftNzMaskUV, upNzMaskUV[mbX], 2)
 
-		var newLeftNzMaskU, newUpNzMaskU uint8
-		for blockY := 0; blockY < 2; blockY++ {
-			nz := lnzUV[blockY]
-			for blockX := 0; blockX < 2; blockX++ {
-				blockIdx := blockY*2 + blockX
-				ctx := int(nz + unzUV[blockX])
-				if ctx > 2 {
-					ctx = 2
-				}
-				hasNz := te.EncodeBlockWithContext(mb.uCoeffs[blockIdx], PlaneUV, 0, ctx)
-				nzVal := uint8(0)
-				if hasNz {
-					nzVal = 1
-				}
-				nz = nzVal
-				unzUV[blockX] = nzVal
-			}
-			lnzUV[blockY] = nz
-			newLeftNzMaskU |= nz << blockY
-		}
-		for i := 0; i < 2; i++ {
-			newUpNzMaskU |= unzUV[i] << i
-		}
-
-		// Encode 4 V blocks (plane 2 = PlaneUV)
-		// Reset UV context for V (uses same left/above tracking)
-		lnzUV[0] = (leftNzMaskUV >> 2) & 1
-		lnzUV[1] = (leftNzMaskUV >> 3) & 1
-		unzUV[0] = (upNzMaskUV[mbX] >> 2) & 1
-		unzUV[1] = (upNzMaskUV[mbX] >> 3) & 1
-
-		var newLeftNzMaskV, newUpNzMaskV uint8
-		for blockY := 0; blockY < 2; blockY++ {
-			nz := lnzUV[blockY]
-			for blockX := 0; blockX < 2; blockX++ {
-				blockIdx := blockY*2 + blockX
-				ctx := int(nz + unzUV[blockX])
-				if ctx > 2 {
-					ctx = 2
-				}
-				hasNz := te.EncodeBlockWithContext(mb.vCoeffs[blockIdx], PlaneUV, 0, ctx)
-				nzVal := uint8(0)
-				if hasNz {
-					nzVal = 1
-				}
-				nz = nzVal
-				unzUV[blockX] = nzVal
-			}
-			lnzUV[blockY] = nz
-			newLeftNzMaskV |= nz << blockY
-		}
-		for i := 0; i < 2; i++ {
-			newUpNzMaskV |= unzUV[i] << i
-		}
-
-		// Combine U and V masks
-		leftNzMaskUV = newLeftNzMaskU | (newLeftNzMaskV << 2)
-		upNzMaskUV[mbX] = newUpNzMaskU | (newUpNzMaskV << 2)
+		leftNzMaskUV = newLeftU | (newLeftV << 2)
+		upNzMaskUV[mbX] = newUpU | (newUpV << 2)
 	}
 }

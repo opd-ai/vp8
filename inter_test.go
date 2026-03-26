@@ -634,7 +634,7 @@ func TestBuildInterFrame(t *testing.T) {
 		},
 	}
 
-	frame, err := BuildInterFrame(32, 16, 24, 0, 0, 0, 0, 0, OnePartition, mbs)
+	frame, err := BuildInterFrame(32, 16, 24, 0, 0, 0, 0, 0, OnePartition, loopFilterParams{}, mbs)
 	if err != nil {
 		t.Fatalf("BuildInterFrame: %v", err)
 	}

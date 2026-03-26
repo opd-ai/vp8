@@ -170,17 +170,17 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 // the first partition. Inter-frame headers differ from key-frame headers in
 // several ways per RFC 6386 §9.
 func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas,
-	partCount PartitionCount, mbs []macroblock,
+	partCount PartitionCount, loopFilter loopFilterParams, mbs []macroblock,
 ) {
 	// Segmentation (1 bit): disabled
 	enc.putBit(128, false)
 
 	// Filter type (1 bit): 0 = normal
 	enc.putBit(128, false)
-	// Loop filter level (6 bits): 0 (disabled for now)
-	enc.putLiteral(0, 6)
+	// Loop filter level (6 bits)
+	enc.putLiteral(uint32(loopFilter.level), 6)
 	// Sharpness level (3 bits)
-	enc.putLiteral(0, 3)
+	enc.putLiteral(uint32(loopFilter.sharpness), 3)
 
 	// Loop filter delta flags (1 bit): 0 = no delta
 	enc.putBit(128, false)
@@ -271,7 +271,7 @@ func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas Quan
 //
 // Reference: RFC 6386 §9.1 (frame tag for inter frames)
 func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int,
-	partCount PartitionCount, mbs []macroblock,
+	partCount PartitionCount, loopFilter loopFilterParams, mbs []macroblock,
 ) ([]byte, error) {
 	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
 		return nil, errInvalidDimensions
@@ -289,7 +289,7 @@ func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDel
 
 	// Encode first partition (inter-frame header + MB modes)
 	partEnc := newBoolEncoder()
-	encodeInterFrameHeader(partEnc, width, height, qi, deltas, partCount, mbs)
+	encodeInterFrameHeader(partEnc, width, height, qi, deltas, partCount, loopFilter, mbs)
 	firstPart := partEnc.flush()
 
 	// Encode residual partitions (same codec as key frames)

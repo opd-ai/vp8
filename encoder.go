@@ -224,7 +224,7 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 		// Build key frame bitstream
 		result, err := BuildKeyFrame(e.width, e.height, e.qi,
 			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
-			e.partitionCount, mbs)
+			e.partitionCount, e.loopFilter, mbs)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +256,7 @@ func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
 	// Build inter frame bitstream
 	result, err := BuildInterFrame(e.width, e.height, e.qi,
 		e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
-		e.partitionCount, mbs)
+		e.partitionCount, e.loopFilter, mbs)
 	if err != nil {
 		return nil, err
 	}
@@ -300,13 +300,10 @@ func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *
 
 	reconstructFrame(&recon, mbs, qf, e.refFrames, frame)
 
-	// NOTE: Loop filtering of reconstructed reference frames is intentionally
-	// disabled here because the frame headers currently always signal
-	// loop_filter_level=0. Applying a non-zero loop filter at the encoder
-	// would cause encoder/decoder reference mismatch and inter-frame drift.
-	// Once loop filter parameters are correctly encoded in the bitstream
-	// headers, the call to applyLoopFilter can be re-enabled.
-	// applyLoopFilter(&recon, e.loopFilter)
+	// Apply loop filter to reconstructed reference frame if enabled.
+	// The loop filter level is encoded in the frame header, ensuring
+	// encoder and decoder apply the same filtering to reference frames.
+	applyLoopFilter(&recon, e.loopFilter)
 
 	// Store as last reference frame
 	e.refFrames.updateLast(recon.Y, recon.Cb, recon.Cr)
