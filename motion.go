@@ -82,7 +82,7 @@ type motionEstimateResult struct {
 //   - predMV: predicted motion vector (from neighbors)
 //
 // Returns the best motion vector and its SAD cost.
-func estimateMotion(srcY []byte, ref []byte, refW, refH, mbX, mbY int, predMV motionVector) motionEstimateResult {
+func estimateMotion(srcY, ref []byte, refW, refH, mbX, mbY int, predMV motionVector) motionEstimateResult {
 	// Snap predicted MV to 2-pel grid (multiples of 8 qpel) so that
 	// chroma MVs (halved from luma) always land on integer pixels.
 	snappedPred := snapMVTo2Pel(predMV)
@@ -128,8 +128,14 @@ func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVec
 	// Large diamond pattern offsets (in quarter-pixel units: 8 qpel = 2 pixels)
 	// Using 2-pixel steps ensures chroma MV (luma MV / 2) is always integer-pel.
 	largeDiamond := [8]motionVector{
-		{0, -8}, {0, 8}, {-8, 0}, {8, 0},
-		{-8, -8}, {8, -8}, {-8, 8}, {8, 8},
+		{0, -8},
+		{0, 8},
+		{-8, 0},
+		{8, 0},
+		{-8, -8},
+		{8, -8},
+		{-8, 8},
+		{8, 8},
 	}
 
 	// Small diamond pattern offsets (2-pixel steps)

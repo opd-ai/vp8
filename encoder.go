@@ -85,11 +85,11 @@ func NewEncoder(width, height, fps int) (*Encoder, error) {
 		return nil, errors.New("vp8: fps must be positive")
 	}
 	return &Encoder{
-		width:   width,
-		height:  height,
-		fps:     fps,
-		bitrate: 500_000, // default 500 kbps
-		qi:      24,      // default quantizer index
+		width:     width,
+		height:    height,
+		fps:       fps,
+		bitrate:   500_000, // default 500 kbps
+		qi:        24,      // default quantizer index
 		refFrames: newRefFrameManager(width, height),
 	}, nil
 }

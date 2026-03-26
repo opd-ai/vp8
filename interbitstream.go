@@ -16,21 +16,21 @@ package vp8
 var interMVProbs = [2][19]uint8{
 	// Horizontal (x) component probabilities
 	{
-		162, // is_short
-		128, // sign
-		225, // short tree bit 0
-		146, // short tree bit 1
-		172, // short tree bit 2
+		162,               // is_short
+		128,               // sign
+		225,               // short tree bit 0
+		146,               // short tree bit 1
+		172,               // short tree bit 2
 		147, 214, 39, 156, // short tree bits 3..6
 		128, 129, 132, 75, 145, 178, 206, 239, 254, 254, // long bits
 	},
 	// Vertical (y) component probabilities
 	{
-		164, // is_short
-		128, // sign
-		204, // short tree bit 0
-		170, // short tree bit 1
-		119, // short tree bit 2
+		164,                // is_short
+		128,                // sign
+		204,                // short tree bit 0
+		170,                // short tree bit 1
+		119,                // short tree bit 2
 		235, 140, 230, 228, // short tree bits 3..6
 		128, 130, 130, 74, 148, 180, 203, 236, 254, 254, // long bits
 	},
@@ -130,7 +130,7 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 	case refFrameLast:
 		enc.putBit(128, false) // last
 	case refFrameGolden:
-		enc.putBit(128, true) // not last
+		enc.putBit(128, true)  // not last
 		enc.putBit(128, false) // golden
 	case refFrameAltRef:
 		enc.putBit(128, true) // not last
@@ -146,8 +146,8 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
 		enc.putBit(interMBModeProbs[1], false) // NEARMV
 	case mvModeZeroMV:
-		enc.putBit(interMBModeProbs[0], true) // not NEARESTMV
-		enc.putBit(interMBModeProbs[1], true) // not NEARMV
+		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
+		enc.putBit(interMBModeProbs[1], true)  // not NEARMV
 		enc.putBit(interMBModeProbs[2], false) // ZEROMV
 	case mvModeNewMV:
 		enc.putBit(interMBModeProbs[0], true) // not NEARESTMV
@@ -170,8 +170,8 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 // the first partition. Inter-frame headers differ from key-frame headers in
 // several ways per RFC 6386 §9.
 func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas,
-	partCount PartitionCount, mbs []macroblock) {
-
+	partCount PartitionCount, mbs []macroblock,
+) {
 	// Segmentation (1 bit): disabled
 	enc.putBit(128, false)
 
@@ -271,8 +271,8 @@ func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas Quan
 //
 // Reference: RFC 6386 §9.1 (frame tag for inter frames)
 func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int,
-	partCount PartitionCount, mbs []macroblock) ([]byte, error) {
-
+	partCount PartitionCount, mbs []macroblock,
+) ([]byte, error) {
 	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
 		return nil, errInvalidDimensions
 	}

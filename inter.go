@@ -23,8 +23,8 @@ package vp8
 //
 // Returns the processed macroblock with either inter or intra mode selected.
 func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
-	mbX, mbY, mbW int, mbs []macroblock, qf QuantFactors, ctx *mbContext) macroblock {
-
+	mbX, mbY, mbW int, mbs []macroblock, qf QuantFactors, ctx *mbContext,
+) macroblock {
 	mb := macroblock{
 		skip:    true,
 		isInter: false,

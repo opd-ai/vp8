@@ -252,10 +252,10 @@ func TestMVInRange(t *testing.T) {
 		want bool
 	}{
 		{motionVector{0, 0}, 0, 0, 64, 64, true},
-		{motionVector{-4, 0}, 0, 0, 64, 64, false}, // would go to x=-1
+		{motionVector{-4, 0}, 0, 0, 64, 64, false},  // would go to x=-1
 		{motionVector{0, -4}, 0, 0, 64, 64, false},  // would go to y=-1
-		{motionVector{4, 4}, 16, 16, 48, 48, true},   // reference at (17, 17)
-		{motionVector{40, 0}, 16, 16, 48, 48, true},   // 16+10+16 = 42 <= 48
+		{motionVector{4, 4}, 16, 16, 48, 48, true},  // reference at (17, 17)
+		{motionVector{40, 0}, 16, 16, 48, 48, true}, // 16+10+16 = 42 <= 48
 	}
 
 	for i, tt := range tests {
@@ -735,9 +735,9 @@ func TestSnapMVTo2Pel(t *testing.T) {
 		{motionVector{8, 8}, motionVector{8, 8}},       // already 2-pel
 		{motionVector{-8, -8}, motionVector{-8, -8}},   // negative 2-pel
 		{motionVector{-4, -4}, motionVector{-8, -8}},   // negative 1-pel rounds away from zero to -2-pel
-		{motionVector{16, -16}, motionVector{16, -16}},  // 4-pel
-		{motionVector{3, -3}, motionVector{0, 0}},       // small values round to zero
-		{motionVector{12, -12}, motionVector{16, -16}},  // rounds up
+		{motionVector{16, -16}, motionVector{16, -16}}, // 4-pel
+		{motionVector{3, -3}, motionVector{0, 0}},      // small values round to zero
+		{motionVector{12, -12}, motionVector{16, -16}}, // rounds up
 	}
 
 	for _, tt := range tests {

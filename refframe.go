@@ -174,7 +174,8 @@ func (m *refFrameManager) reset() {
 // For key frames: reconstructs from intra predictions.
 // For inter frames: reconstructs from motion-compensated predictions.
 func reconstructFrame(recon *refFrameBuffer, mbs []macroblock, qf QuantFactors,
-	ref *refFrameManager, frame *Frame) {
+	ref *refFrameManager, frame *Frame,
+) {
 	width := recon.Width
 	height := recon.Height
 	mbW := (width + 15) / 16

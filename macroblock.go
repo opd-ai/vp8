@@ -44,11 +44,11 @@ type macroblock struct {
 // mbContext holds the neighbor context needed for macroblock prediction.
 type mbContext struct {
 	// Luma neighbors — fixed-size backing arrays to avoid per-MB heap allocations.
-	lumaAboveBuf   [16]byte
-	lumaLeftBuf    [16]byte
-	lumaAbove      []byte // 16 pixels above (nil if not available, else slice of lumaAboveBuf)
-	lumaLeft       []byte // 16 pixels to the left (nil if not available, else slice of lumaLeftBuf)
-	lumaTopLeft    byte   // pixel at (-1, -1)
+	lumaAboveBuf [16]byte
+	lumaLeftBuf  [16]byte
+	lumaAbove    []byte // 16 pixels above (nil if not available, else slice of lumaAboveBuf)
+	lumaLeft     []byte // 16 pixels to the left (nil if not available, else slice of lumaLeftBuf)
+	lumaTopLeft  byte   // pixel at (-1, -1)
 
 	// Chroma neighbors (8x8 for each U/V) — fixed-size backing arrays.
 	chromaAboveUBuf [8]byte
@@ -57,10 +57,10 @@ type mbContext struct {
 	chromaLeftVBuf  [8]byte
 	chromaAboveU    []byte
 	chromaLeftU     []byte
-	chromaTopLeftU byte
-	chromaAboveV   []byte
-	chromaLeftV    []byte
-	chromaTopLeftV byte
+	chromaTopLeftU  byte
+	chromaAboveV    []byte
+	chromaLeftV     []byte
+	chromaTopLeftV  byte
 }
 
 // bPredSADThreshold controls when B_PRED mode is selected over 16×16 modes.
