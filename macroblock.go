@@ -1,5 +1,9 @@
 package vp8
 
+import "fmt"
+
+var debugMB = false // Set to true to debug macroblock mode selection
+
 // macroblock holds the data for one 16x16 VP8 macroblock.
 type macroblock struct {
 	lumaMode   intraMode
@@ -69,7 +73,7 @@ type mbContext struct {
 // accounting for the additional bits needed to encode 16 sub-block modes.
 // TODO: B_PRED encoding has a bitstream issue causing decode failures.
 // Temporarily disabled by setting threshold to 0 (never select B_PRED).
-const bPredSADThreshold = 0
+const bPredSADThreshold = 95 // Very aggressive - only select B_PRED if much better
 
 // processMacroblock processes a 16x16 macroblock from source YUV data.
 // It selects the best prediction modes, computes residuals, transforms
@@ -97,8 +101,14 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 	if bpredSAD*100 < best16x16SAD*bPredSADThreshold {
 		mb.lumaMode = B_PRED
 		mb.bModes = bModes
+		if debugMB {
+			fmt.Printf("MB: B_PRED (SAD=%d < 16x16 SAD=%d * %d%%)\n", bpredSAD, best16x16SAD, bPredSADThreshold)
+		}
 	} else {
 		mb.lumaMode = best16x16Mode
+		if debugMB {
+			fmt.Printf("MB: %v (SAD=%d, bpred SAD=%d)", best16x16Mode, best16x16SAD, bpredSAD)
+		}
 	}
 
 	// Select best 8x8 chroma prediction mode (same for U and V)
@@ -166,6 +176,12 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 					mb.skip = false
 				}
 			}
+		}
+	}
+
+	if debugMB {
+		if mb.lumaMode != B_PRED {
+			fmt.Printf(", skip=%v\n", mb.skip)
 		}
 	}
 

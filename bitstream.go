@@ -340,38 +340,82 @@ func encodeBPredModes(enc *boolEncoder, bModes [16]intraBMode) {
 
 // encodeBMode encodes a single 4×4 sub-block mode using the context-dependent tree.
 // Reference: RFC 6386 §12.1
+//
+// The B_PRED mode tree structure (as decoded by golang.org/x/image/vp8):
+//
+//	prob[0]: DC (false) vs rest (true)
+//	prob[1]: TM (false) vs rest (true)
+//	prob[2]: VE (false) vs rest (true)
+//	prob[3]: {HE,RD,VR} (false) vs {LD,VL,HD,HU} (true)
+//	  if false: prob[4]: HE (false) vs {RD,VR} (true)
+//	             if true: prob[5]: RD (false) vs VR (true)
+//	  if true: prob[6]: LD (false) vs {VL,HD,HU} (true)
+//	           if true: prob[7]: VL (false) vs {HD,HU} (true)
+//	                   if true: prob[8]: HD (false) vs HU (true)
 func encodeBMode(enc *boolEncoder, mode, aboveMode, leftMode intraBMode) {
 	// Get the probability row for this context
 	probs := kfBModeProb[leftMode][aboveMode]
 
-	// The sub-block mode tree structure (RFC 6386 §12.1):
-	// At each node, we branch based on a probability and the mode value.
-	// Tree structure:
-	//   prob[0]: B_DC_PRED (false) vs rest (true)
-	//   If rest:
-	//     prob[1]: B_TM_PRED (false) vs rest (true)
-	//     If rest:
-	//       prob[2]: B_VE_PRED (false) vs rest (true)
-	//       ... and so on
-
-	// Mode indices in tree order: DC, TM, VE, HE, LD, RD, VR, VL, HD, HU
-	treeOrder := [10]intraBMode{
-		B_DC_PRED, B_TM_PRED, B_VE_PRED, B_HE_PRED, B_LD_PRED,
-		B_RD_PRED, B_VR_PRED, B_VL_PRED, B_HD_PRED, B_HU_PRED,
-	}
-
-	// Find which index in tree order matches our mode
-	for i, treeMode := range treeOrder {
-		if mode == treeMode {
-			// Encode the path to this mode
-			for j := 0; j < i; j++ {
-				enc.putBit(probs[j], true) // not this mode
-			}
-			if i < 9 {
-				enc.putBit(probs[i], false) // this is the mode
-			}
-			return
-		}
+	// Navigate the binary tree to encode the mode
+	switch mode {
+	case B_DC_PRED:
+		enc.putBit(probs[0], false) // DC
+	case B_TM_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], false) // TM
+	case B_VE_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], false) // VE
+	case B_HE_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], false) // HE/RD/VR branch
+		enc.putBit(probs[4], false) // HE
+	case B_RD_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], false) // HE/RD/VR branch
+		enc.putBit(probs[4], true)  // not HE
+		enc.putBit(probs[5], false) // RD
+	case B_VR_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], false) // HE/RD/VR branch
+		enc.putBit(probs[4], true)  // not HE
+		enc.putBit(probs[5], true)  // VR
+	case B_LD_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], true)  // LD/VL/HD/HU branch
+		enc.putBit(probs[6], false) // LD
+	case B_VL_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], true)  // LD/VL/HD/HU branch
+		enc.putBit(probs[6], true)  // not LD
+		enc.putBit(probs[7], false) // VL
+	case B_HD_PRED:
+		enc.putBit(probs[0], true)  // not DC
+		enc.putBit(probs[1], true)  // not TM
+		enc.putBit(probs[2], true)  // not VE
+		enc.putBit(probs[3], true)  // LD/VL/HD/HU branch
+		enc.putBit(probs[6], true)  // not LD
+		enc.putBit(probs[7], true)  // not VL
+		enc.putBit(probs[8], false) // HD
+	case B_HU_PRED:
+		enc.putBit(probs[0], true) // not DC
+		enc.putBit(probs[1], true) // not TM
+		enc.putBit(probs[2], true) // not VE
+		enc.putBit(probs[3], true) // LD/VL/HD/HU branch
+		enc.putBit(probs[6], true) // not LD
+		enc.putBit(probs[7], true) // not VL
+		enc.putBit(probs[8], true) // HU
 	}
 }
 
@@ -575,6 +619,10 @@ func encodeResidualMultiPartition(pw *PartitionWriter, mbs []macroblock, mbW, mb
 			}
 			leftNzY16 = nzVal
 			upNzY16[mbX] = nzVal
+		} else {
+			// B_PRED mode: no Y2 block, so reset Y2 context to 0
+			leftNzY16 = 0
+			upNzY16[mbX] = 0
 		}
 
 		// Encode Y blocks
@@ -682,6 +730,11 @@ func encodeResidualPartition(te *TokenEncoder, mbs []macroblock, mbW int) {
 			}
 			leftNzY16 = nzVal
 			upNzY16[mbX] = nzVal
+		} else {
+			// B_PRED mode: no Y2 block, so reset Y2 context to 0
+			// This is critical for decoder/encoder context synchronization
+			leftNzY16 = 0
+			upNzY16[mbX] = 0
 		}
 
 		// Encode 16 Y blocks (4x4 each)
