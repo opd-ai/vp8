@@ -101,8 +101,24 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDelt
 	// prob_skip_false (8 bits): set high so most MBs are marked as skip
 	enc.putLiteral(255, 8)
 
+	// Calculate MB grid dimensions
+	mbW := (width + 15) / 16
+
+	// Track B_PRED sub-block modes for context across macroblock boundaries.
+	// For each column, store the bottom row (4 modes) of the above MB.
+	// For the left context, store the right column (4 modes) of the left MB.
+	aboveBModes := make([][4]intraBMode, mbW) // aboveBModes[mbX] = bottom row of MB above
+	var leftBModes [4]intraBMode              // right column of MB to the left
+
 	// Macroblock-level data: encode prediction modes.
-	for _, mb := range mbs {
+	for mbIdx, mb := range mbs {
+		mbX := mbIdx % mbW
+
+		// Reset left context at the start of each row
+		if mbX == 0 {
+			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+		}
+
 		// coeff_skip (1 bit, prob = prob_skip_false = 255):
 		// A value of 1 (true) means the macroblock has no non-zero DCT
 		// coefficients and the residual partition is not read for this MB.
@@ -114,10 +130,74 @@ func encodeFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDelt
 		//   If not B_PRED: DC_PRED vs {V_PRED, H_PRED, TM_PRED}
 		//   If not DC_PRED: V_PRED vs {H_PRED, TM_PRED}
 		//   If not V_PRED: H_PRED vs TM_PRED
-		encodeYMode(enc, mb.lumaMode, mb.bModes)
+		encodeYModeWithContext(enc, mb.lumaMode, mb.bModes, aboveBModes[mbX], leftBModes)
+
+		// Update context for next MB
+		if mb.lumaMode == B_PRED {
+			// Save bottom row for above context of the MB below
+			for i := 0; i < 4; i++ {
+				aboveBModes[mbX][i] = mb.bModes[12+i] // blocks 12, 13, 14, 15
+			}
+			// Save right column for left context of the next MB
+			for i := 0; i < 4; i++ {
+				leftBModes[i] = mb.bModes[i*4+3] // blocks 3, 7, 11, 15
+			}
+		} else {
+			// For 16x16 modes, decoder uses B_DC_PRED as context
+			aboveBModes[mbX] = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+		}
 
 		// Encode uv_mode (chroma mode) using the chroma mode tree.
 		encodeUVMode(enc, mb.chromaMode)
+	}
+}
+
+// encodeYModeWithContext encodes the 16x16 luma prediction mode using the VP8 mode tree,
+// with proper B_PRED sub-block context from neighboring macroblocks.
+// Reference: RFC 6386 §11.2, §12.1
+func encodeYModeWithContext(enc *boolEncoder, mode intraMode, bModes [16]intraBMode, aboveModes, leftModes [4]intraBMode) {
+	// Key-frame y_mode probabilities (from decoder)
+	const prob16x16 = 145 // true = 16x16 mode, false = B_PRED
+	const probDCvsRest = 156
+	const probDCvsV = 163
+	const probHvsT = 128
+
+	if mode == B_PRED {
+		// B_PRED: readBit(145) returns false
+		enc.putBit(prob16x16, false)
+		// Encode 16 sub-block modes with proper context
+		encodeBPredModesWithContext(enc, bModes, aboveModes, leftModes)
+		return
+	}
+
+	// 16x16 mode: readBit(145) returns true
+	enc.putBit(prob16x16, true)
+
+	// Decoder tree after 16x16 is confirmed:
+	// !readBit(156) -> DC or V
+	//   !readBit(163) -> DC
+	//   readBit(163) -> V
+	// readBit(156) -> H or TM
+	//   !readBit(128) -> H
+	//   readBit(128) -> TM
+
+	if mode == DC_PRED || mode == V_PRED {
+		enc.putBit(probDCvsRest, false) // DC or V branch
+		if mode == DC_PRED {
+			enc.putBit(probDCvsV, false) // DC
+		} else {
+			enc.putBit(probDCvsV, true) // V
+		}
+		return
+	}
+
+	// H or TM
+	enc.putBit(probDCvsRest, true) // H or TM branch
+	if mode == H_PRED {
+		enc.putBit(probHvsT, false) // H
+	} else {
+		enc.putBit(probHvsT, true) // TM
 	}
 }
 
@@ -330,6 +410,40 @@ func encodeBPredModes(enc *boolEncoder, bModes [16]intraBMode) {
 		if bx == 0 {
 			leftMode = dcContext // No left sub-block, use default
 		} else {
+			leftMode = bModes[by*4+(bx-1)]
+		}
+
+		// Encode this sub-block mode using the probability table
+		encodeBMode(enc, bModes[blockIdx], aboveMode, leftMode)
+	}
+}
+
+// encodeBPredModesWithContext encodes the 16 sub-block modes for a B_PRED macroblock,
+// using proper context from neighboring macroblocks.
+// aboveModes: bottom row of sub-block modes from the macroblock above (4 modes)
+// leftModes: right column of sub-block modes from the macroblock to the left (4 modes)
+// Reference: RFC 6386 §12.1
+func encodeBPredModesWithContext(enc *boolEncoder, bModes [16]intraBMode, aboveModes, leftModes [4]intraBMode) {
+	for blockIdx := 0; blockIdx < 16; blockIdx++ {
+		by := blockIdx / 4
+		bx := blockIdx % 4
+
+		// Get context modes (above and left sub-block modes)
+		var aboveMode, leftMode intraBMode
+
+		if by == 0 {
+			// First row of sub-blocks: use context from MB above
+			aboveMode = aboveModes[bx]
+		} else {
+			// Other rows: use context from sub-block above within this MB
+			aboveMode = bModes[(by-1)*4+bx]
+		}
+
+		if bx == 0 {
+			// First column of sub-blocks: use context from MB to the left
+			leftMode = leftModes[by]
+		} else {
+			// Other columns: use context from sub-block to the left within this MB
 			leftMode = bModes[by*4+(bx-1)]
 		}
 

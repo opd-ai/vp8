@@ -1,0 +1,5538 @@
+{
+  "metadata": {
+    "repository": "/home/user/go/src/github.com/opd-ai/vp8",
+    "generated_at": "2026-03-26T21:35:53.527419645-04:00",
+    "analysis_time": 667938741,
+    "files_processed": 16,
+    "tool_version": "1.0.0",
+    "go_version": ""
+  },
+  "overview": {
+    "total_lines_of_code": 2887,
+    "total_functions": 114,
+    "total_methods": 37,
+    "total_structs": 15,
+    "total_interfaces": 0,
+    "total_packages": 1,
+    "total_files": 16
+  },
+  "functions": [
+    {
+      "name": "processInterMacroblock",
+      "package": "vp8",
+      "file": "inter.go",
+      "line": 25,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 62,
+        "code": 38,
+        "comments": 12,
+        "blank": 12
+      },
+      "signature": {
+        "parameter_count": 6,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 3.3
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 705,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "processInterYBlocks",
+      "package": "vp8",
+      "file": "inter.go",
+      "line": 94,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 43,
+        "code": 33,
+        "comments": 3,
+        "blank": 7
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 9,
+        "cognitive": 9,
+        "nesting_depth": 4,
+        "overall": 13.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 152,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "processInterChromaBlocks",
+      "package": "vp8",
+      "file": "inter.go",
+      "line": 141,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 32,
+        "code": 29,
+        "comments": 0,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2
+      },
+      "complexity": {
+        "cyclomatic": 9,
+        "cognitive": 9,
+        "nesting_depth": 5,
+        "overall": 14.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 69,
+        "has_example": false,
+        "quality_score": 0.27599999999999997
+      }
+    },
+    {
+      "name": "processIntraChromaInInterFrame",
+      "package": "vp8",
+      "file": "inter.go",
+      "line": 178,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 47,
+        "code": 44,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2
+      },
+      "complexity": {
+        "cyclomatic": 11,
+        "cognitive": 11,
+        "nesting_depth": 4,
+        "overall": 16.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 158,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "NewYUV420Frame",
+      "package": "vp8",
+      "file": "frame.go",
+      "line": 30,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 16,
+        "code": 16,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": true,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.6
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 183,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "applyLoopFilter",
+      "package": "vp8",
+      "file": "loopfilter.go",
+      "line": 27,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 11,
+        "comments": 3,
+        "blank": 4
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 341,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "computeFilterLimit",
+      "package": "vp8",
+      "file": "loopfilter.go",
+      "line": 51,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 11,
+        "code": 11,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 143,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "filterPlane",
+      "package": "vp8",
+      "file": "loopfilter.go",
+      "line": 67,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 13,
+        "code": 10,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 135,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "simpleFilterVerticalEdge",
+      "package": "vp8",
+      "file": "loopfilter.go",
+      "line": 86,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 30,
+        "code": 21,
+        "comments": 4,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 2,
+        "overall": 8.8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 157,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "simpleFilterHorizontalEdge",
+      "package": "vp8",
+      "file": "loopfilter.go",
+      "line": 122,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 28,
+        "code": 22,
+        "comments": 0,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 2,
+        "overall": 8.8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 161,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "processMacroblock",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 88,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 100,
+        "code": 73,
+        "comments": 12,
+        "blank": 15
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.8
+      },
+      "complexity": {
+        "cyclomatic": 17,
+        "cognitive": 17,
+        "nesting_depth": 4,
+        "overall": 24.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 422,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "processMacroblockSimple",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 193,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 6,
+        "code": 6,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 150,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "evaluateBPredMode",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 204,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 42,
+        "code": 24,
+        "comments": 10,
+        "blank": 8
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.6
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 3,
+        "overall": 8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 144,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "build4x4Context",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 254,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 100,
+        "code": 77,
+        "comments": 18,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.8
+      },
+      "complexity": {
+        "cyclomatic": 23,
+        "cognitive": 23,
+        "nesting_depth": 4,
+        "overall": 31.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 269,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "processYBlocks16x16",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 359,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 64,
+        "code": 39,
+        "comments": 13,
+        "blank": 12
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2
+      },
+      "complexity": {
+        "cyclomatic": 10,
+        "cognitive": 10,
+        "nesting_depth": 4,
+        "overall": 15
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 143,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "processYBlocksBPred",
+      "package": "vp8",
+      "file": "macroblock.go",
+      "line": 428,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 60,
+        "code": 37,
+        "comments": 12,
+        "blank": 11
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2
+      },
+      "complexity": {
+        "cyclomatic": 10,
+        "cognitive": 10,
+        "nesting_depth": 5,
+        "overall": 15.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 132,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "clamp8",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 30,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 39,
+        "has_example": false,
+        "quality_score": 0.15600000000000003
+      }
+    },
+    {
+      "name": "Predict16x16",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 50,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 506,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "predict16x16DC",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 65,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 30,
+        "code": 27,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 4,
+        "overall": 12.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 122,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "predict16x16V",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 100,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 14,
+        "code": 11,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 109,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "predict16x16H",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 119,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 16,
+        "code": 13,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 118,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "predict16x16TM",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 141,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 30,
+        "code": 25,
+        "comments": 2,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 2,
+        "overall": 10.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 165,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "Predict8x8Chroma",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 184,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 527,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "predict8x8DC",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 199,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 30,
+        "code": 27,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 4,
+        "overall": 12.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 83,
+        "has_example": false,
+        "quality_score": 0.332
+      }
+    },
+    {
+      "name": "predict8x8V",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 234,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 12,
+        "code": 11,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 95,
+        "has_example": false,
+        "quality_score": 0.38
+      }
+    },
+    {
+      "name": "predict8x8H",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 251,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 14,
+        "code": 13,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 104,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "predict8x8TM",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 270,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 28,
+        "code": 25,
+        "comments": 0,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 2,
+        "overall": 10.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 95,
+        "has_example": false,
+        "quality_score": 0.38
+      }
+    },
+    {
+      "name": "SelectBest16x16Mode",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 310,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 15,
+        "code": 13,
+        "comments": 0,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.6
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 439,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "computeSAD16x16",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 329,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 9,
+        "code": 9,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 79,
+        "has_example": false,
+        "quality_score": 0.31600000000000006
+      }
+    },
+    {
+      "name": "SelectBest8x8ChromaMode",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 343,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 15,
+        "code": 13,
+        "comments": 0,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.6
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 136,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "computeSAD8x8",
+      "package": "vp8",
+      "file": "prediction.go",
+      "line": 362,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 9,
+        "code": 9,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 75,
+        "has_example": false,
+        "quality_score": 0.30000000000000004
+      }
+    },
+    {
+      "name": "mvEqual",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 22,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 54,
+        "has_example": false,
+        "quality_score": 0.31600000000000006
+      }
+    },
+    {
+      "name": "snapMVTo2Pel",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 30,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 260,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "snapComponentTo2Pel",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 41,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 235,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "estimateMotion",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 85,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 32,
+        "code": 21,
+        "comments": 6,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.8
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 519,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "diamondSearch",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 127,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 69,
+        "code": 59,
+        "comments": 5,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.6
+      },
+      "complexity": {
+        "cyclomatic": 11,
+        "cognitive": 11,
+        "nesting_depth": 3,
+        "overall": 15.8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 415,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "mvInRange",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 201,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 14,
+        "code": 11,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 156,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "computeMCSAD16x16",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 220,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 25,
+        "code": 20,
+        "comments": 2,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.8
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 3,
+        "overall": 8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 100,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "motionCompensate16x16",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 250,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 24,
+        "code": 21,
+        "comments": 0,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 4,
+        "overall": 11.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 142,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "motionCompensate8x8",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 279,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 24,
+        "code": 21,
+        "comments": 0,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 4,
+        "overall": 11.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 134,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "findNearestMV",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 311,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 88,
+        "code": 74,
+        "comments": 6,
+        "blank": 8
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 21,
+        "cognitive": 21,
+        "nesting_depth": 4,
+        "overall": 29.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 272,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "mvCost",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 404,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 17,
+        "code": 12,
+        "comments": 2,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 124,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "mvComponentCost",
+      "package": "vp8",
+      "file": "motion.go",
+      "line": 425,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 66,
+        "has_example": false,
+        "quality_score": 0.264
+      }
+    },
+    {
+      "name": "newRefFrameManager",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 52,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 89,
+        "has_example": false,
+        "quality_score": 0.35600000000000004
+      }
+    },
+    {
+      "name": "allocBuffer",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 60,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 78,
+        "has_example": false,
+        "quality_score": 0.31200000000000006
+      }
+    },
+    {
+      "name": "getRef",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 75,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 15,
+        "code": 15,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 112,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "hasReference",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 94,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 73,
+        "has_example": false,
+        "quality_score": 0.392
+      }
+    },
+    {
+      "name": "updateLast",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 101,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 175,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "updateGolden",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 112,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 56,
+        "has_example": false,
+        "quality_score": 0.22400000000000003
+      }
+    },
+    {
+      "name": "updateAltRef",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 123,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 59,
+        "has_example": false,
+        "quality_score": 0.236
+      }
+    },
+    {
+      "name": "copyLastToGolden",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 135,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 140,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "copyLastToAltRef",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 149,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 74,
+        "has_example": false,
+        "quality_score": 0.296
+      }
+    },
+    {
+      "name": "reset",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 164,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*refFrameManager",
+      "lines": {
+        "total": 3,
+        "code": 3,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 106,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "reconstructFrame",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 176,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 20,
+        "code": 16,
+        "comments": 2,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 5,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.5
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 3,
+        "overall": 6.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 305,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "reconstructIntraMB",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 202,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 12,
+        "code": 7,
+        "comments": 3,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 69,
+        "has_example": false,
+        "quality_score": 0.27599999999999997
+      }
+    },
+    {
+      "name": "buildReconContext",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 219,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 66,
+        "code": 59,
+        "comments": 0,
+        "blank": 7
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 15,
+        "cognitive": 15,
+        "nesting_depth": 3,
+        "overall": 21
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 157,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "reconstructLuma16x16",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 289,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 37,
+        "code": 26,
+        "comments": 6,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 5,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.5
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 5,
+        "overall": 10.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 68,
+        "has_example": false,
+        "quality_score": 0.272
+      }
+    },
+    {
+      "name": "reconstructLumaBPred",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 330,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 33,
+        "code": 25,
+        "comments": 2,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 5,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.5
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 5,
+        "overall": 10.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 58,
+        "has_example": false,
+        "quality_score": 0.23199999999999998
+      }
+    },
+    {
+      "name": "reconstructChroma",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 367,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 51,
+        "code": 43,
+        "comments": 2,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 5,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.5
+      },
+      "complexity": {
+        "cyclomatic": 11,
+        "cognitive": 11,
+        "nesting_depth": 5,
+        "overall": 16.8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 67,
+        "has_example": false,
+        "quality_score": 0.268
+      }
+    },
+    {
+      "name": "reconstructInterMB",
+      "package": "vp8",
+      "file": "refframe.go",
+      "line": 423,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 91,
+        "code": 72,
+        "comments": 8,
+        "blank": 11
+      },
+      "signature": {
+        "parameter_count": 5,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.5
+      },
+      "complexity": {
+        "cyclomatic": 15,
+        "cognitive": 15,
+        "nesting_depth": 5,
+        "overall": 22
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 120,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "NewEncoder",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 77,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 17,
+        "code": 17,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": true,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.1
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 1,
+        "overall": 5.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 205,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "SetBitrate",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 100,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 11,
+        "code": 9,
+        "comments": 2,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 191,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "ForceKeyFrame",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 116,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 115,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "SetKeyFrameInterval",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 126,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 372,
+        "has_example": true,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "SetLoopFilterLevel",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 137,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 281,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "SetPartitionCount",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 153,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 288,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "SetQuantizerDeltas",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 171,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 638,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "Encode",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 187,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 81,
+        "code": 53,
+        "comments": 10,
+        "blank": 18
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": true,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.1
+      },
+      "complexity": {
+        "cyclomatic": 9,
+        "cognitive": 9,
+        "nesting_depth": 3,
+        "overall": 13.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 442,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "shouldEncodeKeyFrame",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 272,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 21,
+        "code": 16,
+        "comments": 5,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 1,
+        "overall": 8.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 78,
+        "has_example": false,
+        "quality_score": 0.31200000000000006
+      }
+    },
+    {
+      "name": "reconstructAndStore",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 297,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 12,
+        "code": 5,
+        "comments": 4,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 81,
+        "has_example": false,
+        "quality_score": 0.32400000000000007
+      }
+    },
+    {
+      "name": "extractLumaBlock",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 313,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 15,
+        "code": 15,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 3,
+        "overall": 8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 61,
+        "has_example": false,
+        "quality_score": 0.244
+      }
+    },
+    {
+      "name": "extractChromaBlocks",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 332,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 16,
+        "code": 16,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.6
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 3,
+        "overall": 8
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 71,
+        "has_example": false,
+        "quality_score": 0.284
+      }
+    },
+    {
+      "name": "buildMBContext",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 353,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 70,
+        "code": 60,
+        "comments": 2,
+        "blank": 8
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 15,
+        "cognitive": 15,
+        "nesting_depth": 3,
+        "overall": 21
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 134,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "Width",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 427,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 0,
+        "code": 0,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 52,
+        "has_example": false,
+        "quality_score": 0.30800000000000005
+      }
+    },
+    {
+      "name": "Height",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 430,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 0,
+        "code": 0,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 54,
+        "has_example": false,
+        "quality_score": 0.31600000000000006
+      }
+    },
+    {
+      "name": "FPS",
+      "package": "vp8",
+      "file": "encoder.go",
+      "line": 433,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*Encoder",
+      "lines": {
+        "total": 0,
+        "code": 0,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 39,
+        "has_example": false,
+        "quality_score": 0.256
+      }
+    },
+    {
+      "name": "encodeMVComponent",
+      "package": "vp8",
+      "file": "interbitstream.go",
+      "line": 43,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 44,
+        "code": 28,
+        "comments": 11,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 2,
+        "overall": 10.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 194,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeMV",
+      "package": "vp8",
+      "file": "interbitstream.go",
+      "line": 92,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 4,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 99,
+        "has_example": false,
+        "quality_score": 0.396
+      }
+    },
+    {
+      "name": "encodeInterMBMode",
+      "package": "vp8",
+      "file": "interbitstream.go",
+      "line": 113,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 53,
+        "code": 34,
+        "comments": 15,
+        "blank": 4
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 1,
+        "overall": 7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 245,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeInterFrameHeader",
+      "package": "vp8",
+      "file": "interbitstream.go",
+      "line": 172,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 91,
+        "code": 38,
+        "comments": 33,
+        "blank": 20
+      },
+      "signature": {
+        "parameter_count": 6,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 3
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 178,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "BuildInterFrame",
+      "package": "vp8",
+      "file": "interbitstream.go",
+      "line": 273,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 65,
+        "code": 41,
+        "comments": 11,
+        "blank": 13
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": true,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.6
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 234,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "ForwardDCT4x4",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 12,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 37,
+        "code": 28,
+        "comments": 3,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 236,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "ForwardWHT4x4",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 60,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 32,
+        "code": 24,
+        "comments": 3,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 249,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "QuantizeBlock",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 98,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 19,
+        "code": 14,
+        "comments": 2,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 166,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "DequantizeBlock",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 122,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 8,
+        "code": 6,
+        "comments": 0,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 105,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "ComputeResidual",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 136,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 160,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "ComputeResidual16x16",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 146,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 105,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "InverseDCT4x4",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 160,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 49,
+        "code": 34,
+        "comments": 5,
+        "blank": 10
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 292,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "InverseWHT4x4",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 214,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 31,
+        "code": 24,
+        "comments": 2,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 96,
+        "has_example": false,
+        "quality_score": 0.384
+      }
+    },
+    {
+      "name": "BlockHasNonZeroCoeffs",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 249,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 6,
+        "code": 6,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 80,
+        "has_example": false,
+        "quality_score": 0.42000000000000004
+      }
+    },
+    {
+      "name": "CountNonZeroCoeffs",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 259,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 75,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "ToZigzag",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 279,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 66,
+        "has_example": false,
+        "quality_score": 0.264
+      }
+    },
+    {
+      "name": "FromZigzag",
+      "package": "vp8",
+      "file": "dct.go",
+      "line": 288,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 68,
+        "has_example": false,
+        "quality_score": 0.272
+      }
+    },
+    {
+      "name": "clampQI",
+      "package": "vp8",
+      "file": "quant.go",
+      "line": 48,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 62,
+        "has_example": false,
+        "quality_score": 0.248
+      }
+    },
+    {
+      "name": "GetQuantFactors",
+      "package": "vp8",
+      "file": "quant.go",
+      "line": 71,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 41,
+        "code": 29,
+        "comments": 6,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 1,
+        "overall": 5.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 521,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "GetQuantFactorsSimple",
+      "package": "vp8",
+      "file": "quant.go",
+      "line": 118,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 197,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "quantIndexToQp",
+      "package": "vp8",
+      "file": "quant.go",
+      "line": 127,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 2,
+        "code": 1,
+        "comments": 1,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 276,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "encodeDelta",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 30,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 14,
+        "comments": 2,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 1,
+        "overall": 5.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 250,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeFrameHeader",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 55,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 66,
+        "code": 23,
+        "comments": 32,
+        "blank": 11
+      },
+      "signature": {
+        "parameter_count": 7,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 3.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 216,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeYMode",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 130,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 42,
+        "code": 25,
+        "comments": 12,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 292,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeBPredModes",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 314,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 24,
+        "code": 17,
+        "comments": 4,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 100,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeBMode",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 355,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 64,
+        "code": 61,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 625,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeUVMode",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 424,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 22,
+        "code": 18,
+        "comments": 1,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 1,
+        "overall": 5.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 104,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeChromaPlane",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 453,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 29,
+        "code": 28,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.3
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 3,
+        "overall": 9.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 251,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "BuildKeyFrame",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 496,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 76,
+        "code": 46,
+        "comments": 15,
+        "blank": 15
+      },
+      "signature": {
+        "parameter_count": 4,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": true,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 2.6
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 531,
+        "has_example": false,
+        "quality_score": 0.6000000000000001
+      }
+    },
+    {
+      "name": "encodeResidualMultiPartition",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 577,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 97,
+        "code": 81,
+        "comments": 6,
+        "blank": 10
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 14,
+        "cognitive": 14,
+        "nesting_depth": 4,
+        "overall": 20.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 135,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeResidualPartition",
+      "package": "vp8",
+      "file": "bitstream.go",
+      "line": 679,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 114,
+        "code": 81,
+        "comments": 22,
+        "blank": 11
+      },
+      "signature": {
+        "parameter_count": 3,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.5
+      },
+      "complexity": {
+        "cyclomatic": 14,
+        "cognitive": 14,
+        "nesting_depth": 4,
+        "overall": 20.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 104,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "NumPartitions",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 18,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "PartitionCount",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 55,
+        "has_example": false,
+        "quality_score": 0.32000000000000006
+      }
+    },
+    {
+      "name": "NewPartitionWriter",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 32,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 121,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "GetTokenEncoder",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 48,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*PartitionWriter",
+      "lines": {
+        "total": 2,
+        "code": 2,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 187,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "GetEncoder",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 54,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*PartitionWriter",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 68,
+        "has_example": false,
+        "quality_score": 0.372
+      }
+    },
+    {
+      "name": "Finalize",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 60,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*PartitionWriter",
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 123,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "BuildPartitionSizes",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 72,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 14,
+        "code": 11,
+        "comments": 2,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 235,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "ConcatPartitions",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 90,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 9,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 70,
+        "has_example": false,
+        "quality_score": 0.27999999999999997
+      }
+    },
+    {
+      "name": "EncodePartitionCount",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 105,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 121,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "DefaultPartitionConfig",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 117,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 104,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "AssembleMultiPartitionFrame",
+      "package": "vp8",
+      "file": "partition.go",
+      "line": 129,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 11,
+        "code": 8,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 247,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "newBoolEncoder",
+      "package": "vp8",
+      "file": "bool_encoder.go",
+      "line": 35,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": false,
+        "comment_length": 0,
+        "has_example": false,
+        "quality_score": 0
+      }
+    },
+    {
+      "name": "putBit",
+      "package": "vp8",
+      "file": "bool_encoder.go",
+      "line": 42,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*boolEncoder",
+      "lines": {
+        "total": 43,
+        "code": 31,
+        "comments": 5,
+        "blank": 7
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 5,
+        "overall": 12.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 190,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "putLiteral",
+      "package": "vp8",
+      "file": "bool_encoder.go",
+      "line": 89,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*boolEncoder",
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 63,
+        "has_example": false,
+        "quality_score": 0.252
+      }
+    },
+    {
+      "name": "flush",
+      "package": "vp8",
+      "file": "bool_encoder.go",
+      "line": 98,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*boolEncoder",
+      "lines": {
+        "total": 5,
+        "code": 4,
+        "comments": 1,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 0,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.3
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 118,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "NewTokenEncoder",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 260,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 4,
+        "code": 4,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 45,
+        "has_example": false,
+        "quality_score": 0.18000000000000002
+      }
+    },
+    {
+      "name": "getContext",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 271,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 7,
+        "code": 7,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 160,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "tokenFromValue",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 282,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 27,
+        "code": 27,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 1,
+        "overall": 4.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 71,
+        "has_example": false,
+        "quality_score": 0.284
+      }
+    },
+    {
+      "name": "encodeCoeffValue",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 317,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 31,
+        "code": 22,
+        "comments": 4,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 1,
+        "overall": 7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 279,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "encodeValueTree",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 367,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 55,
+        "code": 42,
+        "comments": 9,
+        "blank": 4
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 2,
+        "overall": 11.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 563,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "EncodeToken",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 430,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 23,
+        "code": 16,
+        "comments": 2,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 2,
+        "overall": 6.2
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 224,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "encodeTokenTree",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 489,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 74,
+        "code": 57,
+        "comments": 11,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 11,
+        "cognitive": 11,
+        "nesting_depth": 2,
+        "overall": 15.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 1050,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "encodeCatExtra",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 567,
+      "is_exported": false,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 5,
+        "code": 5,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 2,
+        "cognitive": 2,
+        "nesting_depth": 1,
+        "overall": 3.1
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 59,
+        "has_example": false,
+        "quality_score": 0.236
+      }
+    },
+    {
+      "name": "EncodeEOB",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 576,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 3,
+        "code": 3,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 41,
+        "has_example": false,
+        "quality_score": 0.164
+      }
+    },
+    {
+      "name": "EncodeBlock",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 592,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 537,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "EncodeBlockWithContext",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 599,
+      "is_exported": true,
+      "is_method": true,
+      "receiver_type": "*TokenEncoder",
+      "lines": {
+        "total": 52,
+        "code": 33,
+        "comments": 13,
+        "blank": 6
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 4,
+        "overall": 12.4
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 236,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "EncodeCoeffProbUpdates",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 843,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 29,
+        "code": 21,
+        "comments": 4,
+        "blank": 4
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.3
+      },
+      "complexity": {
+        "cyclomatic": 6,
+        "cognitive": 6,
+        "nesting_depth": 5,
+        "overall": 10.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 432,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "EncodeNoCoeffProbUpdates",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 877,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 10,
+        "code": 10,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 4,
+        "overall": 8.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 124,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "CopyCoeffProbs",
+      "package": "vp8",
+      "file": "token.go",
+      "line": 891,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 9,
+        "code": 9,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 4,
+        "cognitive": 4,
+        "nesting_depth": 3,
+        "overall": 6.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 70,
+        "has_example": false,
+        "quality_score": 0.27999999999999997
+      }
+    },
+    {
+      "name": "Predict4x4",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 44,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 43,
+        "code": 39,
+        "comments": 3,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 2,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 1,
+        "overall": 7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 388,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "avg2",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 91,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 31,
+        "has_example": false,
+        "quality_score": 0.124
+      }
+    },
+    {
+      "name": "avg3",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 96,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 1,
+        "code": 1,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 39,
+        "has_example": false,
+        "quality_score": 0.15600000000000003
+      }
+    },
+    {
+      "name": "extractAbove8",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 104,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 18,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 7,
+        "cognitive": 7,
+        "nesting_depth": 3,
+        "overall": 10.6
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 283,
+        "has_example": false,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "name": "predict4x4DC",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 126,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 33,
+        "code": 30,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 9,
+        "cognitive": 9,
+        "nesting_depth": 4,
+        "overall": 13.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 48,
+        "has_example": false,
+        "quality_score": 0.192
+      }
+    },
+    {
+      "name": "predict4x4TM",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 163,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 33,
+        "code": 30,
+        "comments": 1,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 9,
+        "cognitive": 9,
+        "nesting_depth": 2,
+        "overall": 12.7
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 60,
+        "has_example": false,
+        "quality_score": 0.24
+      }
+    },
+    {
+      "name": "predict4x4VE",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 200,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 34,
+        "code": 28,
+        "comments": 3,
+        "blank": 3
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 8,
+        "cognitive": 8,
+        "nesting_depth": 3,
+        "overall": 11.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 73,
+        "has_example": false,
+        "quality_score": 0.292
+      }
+    },
+    {
+      "name": "predict4x4HE",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 238,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 31,
+        "code": 20,
+        "comments": 6,
+        "blank": 5
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 5,
+        "cognitive": 5,
+        "nesting_depth": 2,
+        "overall": 7.5
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 75,
+        "has_example": false,
+        "quality_score": 0.30000000000000004
+      }
+    },
+    {
+      "name": "predict4x4LD",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 273,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 17,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 68,
+        "has_example": false,
+        "quality_score": 0.272
+      }
+    },
+    {
+      "name": "predict4x4RD",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 295,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 16,
+        "comments": 1,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 69,
+        "has_example": false,
+        "quality_score": 0.27599999999999997
+      }
+    },
+    {
+      "name": "predict4x4VR",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 317,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 16,
+        "code": 16,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 73,
+        "has_example": false,
+        "quality_score": 0.292
+      }
+    },
+    {
+      "name": "predict4x4VL",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 337,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 17,
+        "comments": 0,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 72,
+        "has_example": false,
+        "quality_score": 0.288
+      }
+    },
+    {
+      "name": "predict4x4HD",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 359,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 18,
+        "code": 16,
+        "comments": 1,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 1,
+        "cognitive": 1,
+        "nesting_depth": 0,
+        "overall": 1.3
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 74,
+        "has_example": false,
+        "quality_score": 0.296
+      }
+    },
+    {
+      "name": "predict4x4HU",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 381,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 26,
+        "code": 24,
+        "comments": 1,
+        "blank": 1
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 0,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.5
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 72,
+        "has_example": false,
+        "quality_score": 0.288
+      }
+    },
+    {
+      "name": "SelectBest4x4Mode",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 412,
+      "is_exported": true,
+      "is_method": false,
+      "lines": {
+        "total": 14,
+        "code": 12,
+        "comments": 0,
+        "blank": 2
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 2,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 1.1
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 153,
+        "has_example": false,
+        "quality_score": 0.5
+      }
+    },
+    {
+      "name": "computeSAD4x4",
+      "package": "vp8",
+      "file": "bpred.go",
+      "line": 430,
+      "is_exported": false,
+      "is_method": false,
+      "lines": {
+        "total": 9,
+        "code": 9,
+        "comments": 0,
+        "blank": 0
+      },
+      "signature": {
+        "parameter_count": 1,
+        "return_count": 1,
+        "has_variadic": false,
+        "returns_error": false,
+        "interface_parameters": 0,
+        "generic_parameters": null,
+        "signature_complexity": 0.8
+      },
+      "complexity": {
+        "cyclomatic": 3,
+        "cognitive": 3,
+        "nesting_depth": 2,
+        "overall": 4.9
+      },
+      "documentation": {
+        "has_comment": true,
+        "comment_length": 75,
+        "has_example": false,
+        "quality_score": 0.30000000000000004
+      }
+    }
+  ],
+  "structs": null,
+  "interfaces": null,
+  "packages": null,
+  "circular_dependencies": null,
+  "patterns": {
+    "design_patterns": {
+      "singleton": [],
+      "factory": [],
+      "builder": [],
+      "observer": [],
+      "strategy": []
+    },
+    "concurrency_patterns": {
+      "worker_pools": [],
+      "pipelines": [],
+      "fan_out": [],
+      "fan_in": [],
+      "semaphores": [],
+      "goroutines": {
+        "total_count": 0,
+        "anonymous_count": 0,
+        "named_count": 0,
+        "potential_leaks": [],
+        "instances": []
+      },
+      "channels": {
+        "total_count": 0,
+        "buffered_count": 0,
+        "unbuffered_count": 0,
+        "directional_count": 0,
+        "instances": []
+      },
+      "sync_primitives": {
+        "mutexes": [],
+        "rw_mutexes": [],
+        "wait_groups": [],
+        "once": [],
+        "cond": [],
+        "atomic": []
+      }
+    },
+    "anti_patterns": {
+      "god_objects": [],
+      "long_methods": [],
+      "deep_nesting": [],
+      "magic_numbers": [],
+      "performance_antipatterns": [
+        {
+          "type": "bare_error_return",
+          "description": "Error returned without context wrapping",
+          "severity": "high",
+          "file": "/home/user/go/src/github.com/opd-ai/vp8/encoder.go",
+          "line": 190,
+          "suggestion": "Wrap error with fmt.Errorf(\"context: %w\", err) to preserve error chain"
+        },
+        {
+          "type": "bare_error_return",
+          "description": "Error returned without context wrapping",
+          "severity": "high",
+          "file": "/home/user/go/src/github.com/opd-ai/vp8/encoder.go",
+          "line": 228,
+          "suggestion": "Wrap error with fmt.Errorf(\"context: %w\", err) to preserve error chain"
+        },
+        {
+          "type": "bare_error_return",
+          "description": "Error returned without context wrapping",
+          "severity": "high",
+          "file": "/home/user/go/src/github.com/opd-ai/vp8/encoder.go",
+          "line": 260,
+          "suggestion": "Wrap error with fmt.Errorf(\"context: %w\", err) to preserve error chain"
+        },
+        {
+          "type": "memory_allocation",
+          "description": "append() in loop without pre-allocation",
+          "severity": "medium",
+          "file": "/home/user/go/src/github.com/opd-ai/vp8/partition.go",
+          "line": 98,
+          "suggestion": "Pre-allocate slice with make() for known capacity"
+        },
+        {
+          "type": "giant_switch",
+          "description": "Switch statement with excessive branches",
+          "severity": "medium",
+          "file": "/home/user/go/src/github.com/opd-ai/vp8/token.go",
+          "line": 286,
+          "suggestion": "Consider using a dispatch map or strategy pattern instead of giant switch statement"
+        }
+      ]
+    }
+  },
+  "complexity": {
+    "average_function_complexity": 0,
+    "average_struct_complexity": 0,
+    "highest_complexity": null,
+    "complexity_distribution": null
+  },
+  "documentation": {
+    "coverage": {
+      "packages": 0,
+      "functions": 0,
+      "types": 0,
+      "methods": 0,
+      "overall": 0
+    },
+    "quality": {
+      "average_length": 0,
+      "code_examples": 0,
+      "inline_comments": 0,
+      "block_comments": 0,
+      "quality_score": 0
+    },
+    "todo_comments": null,
+    "fixme_comments": null,
+    "hack_comments": null,
+    "bug_comments": null,
+    "xxx_comments": null,
+    "deprecated_comments": null,
+    "note_comments": null,
+    "stale_annotations": 0,
+    "annotations_by_category": null
+  },
+  "generics": {
+    "type_parameters": {
+      "count": 0,
+      "constraints": null,
+      "complexity": null
+    },
+    "instantiations": {
+      "functions": null,
+      "types": null,
+      "methods": null
+    },
+    "constraint_usage": null,
+    "complexity_score": 0
+  },
+  "duplication": {
+    "clone_pairs": 0,
+    "duplicated_lines": 0,
+    "duplication_ratio": 0,
+    "largest_clone_size": 0,
+    "clones": null
+  },
+  "naming": {
+    "file_name_violations": 0,
+    "identifier_violations": 0,
+    "package_name_violations": 0,
+    "overall_naming_score": 0,
+    "file_name_issues": null,
+    "identifier_issues": null,
+    "package_name_issues": null
+  },
+  "placement": {
+    "misplaced_functions": 0,
+    "misplaced_methods": 0,
+    "low_cohesion_files": 0,
+    "avg_file_cohesion": 0,
+    "function_issues": null,
+    "method_issues": null,
+    "cohesion_issues": null
+  },
+  "organization": {
+    "oversized_files": null,
+    "oversized_packages": null,
+    "deep_directories": null,
+    "high_fan_in_packages": null,
+    "high_fan_out_packages": null,
+    "avg_package_instability": 0
+  },
+  "burden": {
+    "magic_numbers": null,
+    "dead_code": {
+      "unreferenced_functions": null,
+      "unreachable_code": null,
+      "total_dead_lines": 0,
+      "dead_code_percent": 0
+    },
+    "complex_signatures": null,
+    "deeply_nested_functions": null,
+    "feature_envy_methods": null
+  },
+  "scores": {
+    "file_scores": null,
+    "package_scores": null
+  },
+  "test_coverage": {
+    "function_coverage_rate": 0,
+    "complexity_coverage_rate": 0,
+    "high_risk_functions": null,
+    "coverage_gaps": null
+  },
+  "test_quality": {
+    "total_tests": 0,
+    "avg_assertions_per_test": 0,
+    "test_files": null
+  }
+}

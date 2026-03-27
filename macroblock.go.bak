@@ -73,7 +73,7 @@ type mbContext struct {
 // accounting for the additional bits needed to encode 16 sub-block modes.
 // TODO: B_PRED encoding has a bitstream issue causing decode failures.
 // Temporarily disabled by setting threshold to 0 (never select B_PRED).
-const bPredSADThreshold = 120 // Disabled: B_PRED bitstream encoding causes decode failures
+const bPredSADThreshold = 0 // Disabled: B_PRED bitstream encoding causes decode failures
 
 // processMacroblock processes a 16x16 macroblock from source YUV data.
 // It selects the best prediction modes, computes residuals, transforms

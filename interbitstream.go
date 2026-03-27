@@ -250,18 +250,95 @@ func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas Quan
 		}
 	}
 
+	// Calculate MB grid dimensions for context tracking
+	mbW := (width + 15) / 16
+
+	// Track B_PRED sub-block modes for context across macroblock boundaries.
+	aboveBModes := make([][4]intraBMode, mbW)
+	var leftBModes [4]intraBMode
+
 	// Macroblock modes
-	for _, mb := range mbs {
+	for mbIdx, mb := range mbs {
+		mbX := mbIdx % mbW
+
+		// Reset left context at the start of each row
+		if mbX == 0 {
+			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+		}
+
 		// Skip flag
 		enc.putBit(255, mb.skip)
 
 		// Encode macroblock mode
-		encodeInterMBMode(enc, &mb)
+		encodeInterMBModeWithContext(enc, &mb, aboveBModes[mbX], leftBModes)
+
+		// Update B_PRED context for next MB
+		if !mb.isInter && mb.lumaMode == B_PRED {
+			for i := 0; i < 4; i++ {
+				aboveBModes[mbX][i] = mb.bModes[12+i]
+			}
+			for i := 0; i < 4; i++ {
+				leftBModes[i] = mb.bModes[i*4+3]
+			}
+		} else {
+			aboveBModes[mbX] = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+		}
 
 		// For intra macroblocks, also encode chroma mode
 		if !mb.isInter {
 			encodeUVMode(enc, mb.chromaMode)
 		}
+	}
+}
+
+// encodeInterMBModeWithContext encodes the macroblock mode for an inter-frame macroblock,
+// with proper B_PRED sub-block context from neighboring macroblocks.
+func encodeInterMBModeWithContext(enc *boolEncoder, mb *macroblock, aboveModes, leftModes [4]intraBMode) {
+	if !mb.isInter {
+		// Intra macroblock within inter frame
+		// is_inter = false
+		enc.putBit(63, false) // P(is_inter) - inter frame probability
+		// Encode intra y_mode with proper context
+		encodeYModeWithContext(enc, mb.lumaMode, mb.bModes, aboveModes, leftModes)
+		return
+	}
+
+	// Inter macroblock: is_inter = true
+	enc.putBit(63, true)
+
+	// Encode reference frame (Last, Golden, AltRef)
+	switch mb.refFrame {
+	case refFrameLast:
+		enc.putBit(128, false) // last
+	case refFrameGolden:
+		enc.putBit(128, true)  // not last
+		enc.putBit(128, false) // golden
+	case refFrameAltRef:
+		enc.putBit(128, true) // not last
+		enc.putBit(128, true) // altref
+	}
+
+	// Encode inter prediction mode
+	switch mb.interMode {
+	case mvModeNearestMV:
+		enc.putBit(interMBModeProbs[0], false) // NEARESTMV
+	case mvModeNearMV:
+		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
+		enc.putBit(interMBModeProbs[1], false) // NEARMV
+	case mvModeZeroMV:
+		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
+		enc.putBit(interMBModeProbs[1], true)  // not NEARMV
+		enc.putBit(interMBModeProbs[2], false) // ZEROMV
+	case mvModeNewMV:
+		enc.putBit(interMBModeProbs[0], true) // not NEARESTMV
+		enc.putBit(interMBModeProbs[1], true) // not NEARMV
+		enc.putBit(interMBModeProbs[2], true) // NEWMV
+	}
+
+	// If NEWMV, encode the motion vector difference
+	if mb.interMode == mvModeNewMV {
+		encodeMV(enc, mb.mv, mb.predMV)
 	}
 }
 
