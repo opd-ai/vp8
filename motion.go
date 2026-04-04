@@ -125,8 +125,21 @@ func estimateMotion(srcY, ref []byte, refW, refH, mbX, mbY int, predMV motionVec
 // to ensure that chroma MVs (halved from luma) remain at integer-pel precision,
 // avoiding encoder/decoder mismatch from sub-pel truncation.
 func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVector, startSAD int) (motionVector, int) {
+	bestMV := startMV
+	bestSAD := startSAD
+
+	// Large diamond search (up to maxLargeDiamondSteps iterations)
+	bestMV, bestSAD = largeDiamondSearch(srcY, ref, refW, refH, mbX, mbY, bestMV, bestSAD)
+
+	// Small diamond refinement
+	bestMV, bestSAD = smallDiamondSearch(srcY, ref, refW, refH, mbX, mbY, bestMV, bestSAD)
+
+	return bestMV, bestSAD
+}
+
+// largeDiamondSearch performs large diamond pattern search (8-point).
+func largeDiamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVector, startSAD int) (motionVector, int) {
 	// Large diamond pattern offsets (in quarter-pixel units: 8 qpel = 2 pixels)
-	// Using 2-pixel steps ensures chroma MV (luma MV / 2) is always integer-pel.
 	largeDiamond := [8]motionVector{
 		{0, -8},
 		{0, 8},
@@ -138,7 +151,29 @@ func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVec
 		{8, 8},
 	}
 
-	// Small diamond pattern offsets (2-pixel steps)
+	bestMV := startMV
+	bestSAD := startSAD
+
+	const maxLargeDiamondSteps = 16
+	for step := 0; step < maxLargeDiamondSteps; step++ {
+		improved := false
+		for _, delta := range largeDiamond {
+			newMV, newSAD, found := evaluateMVCandidate(srcY, ref, refW, refH, mbX, mbY, bestMV, delta, bestSAD)
+			if found {
+				bestMV = newMV
+				bestSAD = newSAD
+				improved = true
+			}
+		}
+		if !improved {
+			break
+		}
+	}
+	return bestMV, bestSAD
+}
+
+// smallDiamondSearch performs small diamond pattern search (4-point).
+func smallDiamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVector, startSAD int) (motionVector, int) {
 	smallDiamond := [4]motionVector{
 		{0, -8}, {0, 8}, {-8, 0}, {8, 0},
 	}
@@ -146,45 +181,13 @@ func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVec
 	bestMV := startMV
 	bestSAD := startSAD
 
-	// Large diamond search (up to maxLargeDiamondSteps iterations)
-	const maxLargeDiamondSteps = 16
-	for step := 0; step < maxLargeDiamondSteps; step++ {
-		improved := false
-		for _, delta := range largeDiamond {
-			candidateMV := motionVector{
-				dx: bestMV.dx + delta.dx,
-				dy: bestMV.dy + delta.dy,
-			}
-			if !mvInRange(candidateMV, mbX, mbY, refW, refH) {
-				continue
-			}
-			sad := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, candidateMV)
-			if sad < bestSAD {
-				bestSAD = sad
-				bestMV = candidateMV
-				improved = true
-			}
-		}
-		if !improved {
-			break
-		}
-	}
-
-	// Small diamond refinement
 	for {
 		improved := false
 		for _, delta := range smallDiamond {
-			candidateMV := motionVector{
-				dx: bestMV.dx + delta.dx,
-				dy: bestMV.dy + delta.dy,
-			}
-			if !mvInRange(candidateMV, mbX, mbY, refW, refH) {
-				continue
-			}
-			sad := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, candidateMV)
-			if sad < bestSAD {
-				bestSAD = sad
-				bestMV = candidateMV
+			newMV, newSAD, found := evaluateMVCandidate(srcY, ref, refW, refH, mbX, mbY, bestMV, delta, bestSAD)
+			if found {
+				bestMV = newMV
+				bestSAD = newSAD
 				improved = true
 			}
 		}
@@ -192,8 +195,23 @@ func diamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV motionVec
 			break
 		}
 	}
-
 	return bestMV, bestSAD
+}
+
+// evaluateMVCandidate evaluates a candidate MV and returns it if better.
+func evaluateMVCandidate(srcY, ref []byte, refW, refH, mbX, mbY int, baseMV, delta motionVector, currentBestSAD int) (motionVector, int, bool) {
+	candidateMV := motionVector{
+		dx: baseMV.dx + delta.dx,
+		dy: baseMV.dy + delta.dy,
+	}
+	if !mvInRange(candidateMV, mbX, mbY, refW, refH) {
+		return motionVector{}, 0, false
+	}
+	sad := computeMCSAD16x16(srcY, ref, refW, refH, mbX, mbY, candidateMV)
+	if sad < currentBestSAD {
+		return candidateMV, sad, true
+	}
+	return motionVector{}, 0, false
 }
 
 // mvInRange checks whether applying the motion vector at the given macroblock
@@ -250,28 +268,9 @@ func computeMCSAD16x16(srcY, ref []byte, refW, refH, mbX, mbY int, mv motionVect
 func motionCompensate16x16(dst, ref []byte, refW, refH, mbX, mbY int, mv motionVector) {
 	dxPel := int(mv.dx) / 4
 	dyPel := int(mv.dy) / 4
-
 	refX := mbX + dxPel
 	refY := mbY + dyPel
-
-	for row := 0; row < 16; row++ {
-		srcRow := refY + row
-		if srcRow < 0 {
-			srcRow = 0
-		} else if srcRow >= refH {
-			srcRow = refH - 1
-		}
-
-		for col := 0; col < 16; col++ {
-			srcCol := refX + col
-			if srcCol < 0 {
-				srcCol = 0
-			} else if srcCol >= refW {
-				srcCol = refW - 1
-			}
-			dst[row*16+col] = ref[srcRow*refW+srcCol]
-		}
-	}
+	copyBlockClamped(dst, ref, refW, refH, refX, refY, 16, 16)
 }
 
 // motionCompensate8x8 copies an 8x8 block from the reference frame at
@@ -279,28 +278,85 @@ func motionCompensate16x16(dst, ref []byte, refW, refH, mbX, mbY int, mv motionV
 func motionCompensate8x8(dst, ref []byte, refW, refH, mbX, mbY int, mv motionVector) {
 	dxPel := int(mv.dx) / 4
 	dyPel := int(mv.dy) / 4
-
 	refX := mbX + dxPel
 	refY := mbY + dyPel
+	copyBlockClamped(dst, ref, refW, refH, refX, refY, 8, 8)
+}
 
-	for row := 0; row < 8; row++ {
-		srcRow := refY + row
-		if srcRow < 0 {
-			srcRow = 0
-		} else if srcRow >= refH {
-			srcRow = refH - 1
-		}
-
-		for col := 0; col < 8; col++ {
-			srcCol := refX + col
-			if srcCol < 0 {
-				srcCol = 0
-			} else if srcCol >= refW {
-				srcCol = refW - 1
-			}
-			dst[row*8+col] = ref[srcRow*refW+srcCol]
+// copyBlockClamped copies a block from ref to dst, clamping coordinates to valid range.
+func copyBlockClamped(dst, ref []byte, refW, refH, refX, refY, blockW, blockH int) {
+	for row := 0; row < blockH; row++ {
+		srcRow := clampCoord(refY+row, refH)
+		for col := 0; col < blockW; col++ {
+			srcCol := clampCoord(refX+col, refW)
+			dst[row*blockW+col] = ref[srcRow*refW+srcCol]
 		}
 	}
+}
+
+// clampCoord clamps a coordinate to the valid range [0, max-1].
+func clampCoord(val, max int) int {
+	if val < 0 {
+		return 0
+	}
+	if val >= max {
+		return max - 1
+	}
+	return val
+}
+
+// mvCandidates holds motion vector candidates and their occurrence counts.
+type mvCandidates struct {
+	mvs   [3]motionVector
+	count [3]int
+	n     int
+}
+
+// addCandidate adds or increments a motion vector candidate.
+func (c *mvCandidates) addCandidate(mv motionVector) {
+	for i := 0; i < c.n; i++ {
+		if mvEqual(mv, c.mvs[i]) {
+			c.count[i]++
+			return
+		}
+	}
+	if c.n < 3 {
+		c.mvs[c.n] = mv
+		c.count[c.n] = 1
+		c.n++
+	}
+}
+
+// selectBestTwo returns the two most common motion vectors.
+func (c *mvCandidates) selectBestTwo() (nearest, near motionVector) {
+	if c.n == 0 {
+		return zeroMV, zeroMV
+	}
+
+	bestIdx := c.findMaxCountIndex(-1)
+	nearest = c.mvs[bestIdx]
+
+	if c.n > 1 {
+		secondIdx := c.findMaxCountIndex(bestIdx)
+		if secondIdx >= 0 {
+			near = c.mvs[secondIdx]
+		}
+	}
+	return nearest, near
+}
+
+// findMaxCountIndex finds the index with the highest count, excluding skipIdx.
+func (c *mvCandidates) findMaxCountIndex(skipIdx int) int {
+	bestIdx := -1
+	for i := 0; i < c.n; i++ {
+		if i == skipIdx {
+			continue
+		}
+		if bestIdx == -1 || c.count[i] > c.count[bestIdx] {
+			bestIdx = i
+		}
+	}
+	return bestIdx
 }
 
 // findNearestMV searches the neighboring macroblocks for the nearest
@@ -309,94 +365,57 @@ func motionCompensate8x8(dst, ref []byte, refW, refH, mbX, mbY int, mv motionVec
 // VP8 uses up to 3 neighbors: left, above, and above-right (or above-left).
 // Reference: RFC 6386 §18.2 – Motion Vector Prediction
 func findNearestMV(mbs []macroblock, mbX, mbY, mbW int) (nearest, near motionVector) {
-	var candidates [3]motionVector
-	var counts [3]int
-	numCandidates := 0
+	var cand mvCandidates
 
-	// Left neighbor
+	collectLeftNeighborMV(&cand, mbs, mbX, mbY, mbW)
+	collectAboveNeighborMV(&cand, mbs, mbX, mbY, mbW)
+	collectDiagonalNeighborMV(&cand, mbs, mbX, mbY, mbW)
+
+	return cand.selectBestTwo()
+}
+
+// collectLeftNeighborMV adds the left neighbor's MV if available.
+func collectLeftNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
 	if mbX > 0 {
 		leftIdx := mbY*mbW + (mbX - 1)
 		if mbs[leftIdx].isInter {
-			candidates[numCandidates] = mbs[leftIdx].mv
-			counts[numCandidates] = 1
-			numCandidates++
+			cand.addCandidate(mbs[leftIdx].mv)
 		}
 	}
+}
 
-	// Above neighbor
+// collectAboveNeighborMV adds the above neighbor's MV if available.
+func collectAboveNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
 	if mbY > 0 {
 		aboveIdx := (mbY-1)*mbW + mbX
 		if mbs[aboveIdx].isInter {
-			if numCandidates > 0 && mvEqual(mbs[aboveIdx].mv, candidates[0]) {
-				counts[0]++
-			} else {
-				candidates[numCandidates] = mbs[aboveIdx].mv
-				counts[numCandidates] = 1
-				numCandidates++
-			}
+			cand.addCandidate(mbs[aboveIdx].mv)
 		}
 	}
+}
 
-	// Above-right neighbor (or above-left if at right edge)
-	if mbY > 0 {
-		var diagIdx int
-		if mbX < mbW-1 {
-			diagIdx = (mbY-1)*mbW + (mbX + 1) // above-right
-		} else if mbX > 0 {
-			diagIdx = (mbY-1)*mbW + (mbX - 1) // above-left
-		} else {
-			diagIdx = -1
-		}
-		if diagIdx >= 0 && mbs[diagIdx].isInter {
-			found := false
-			for i := 0; i < numCandidates; i++ {
-				if mvEqual(mbs[diagIdx].mv, candidates[i]) {
-					counts[i]++
-					found = true
-					break
-				}
-			}
-			if !found {
-				candidates[numCandidates] = mbs[diagIdx].mv
-				counts[numCandidates] = 1
-				numCandidates++
-			}
-		}
+// collectDiagonalNeighborMV adds the diagonal neighbor's MV if available.
+// Uses above-right, or above-left if at the right edge.
+func collectDiagonalNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
+	if mbY == 0 {
+		return
 	}
-
-	// Select nearest (most common) and near (second most common)
-	nearest = zeroMV
-	near = zeroMV
-
-	if numCandidates == 0 {
-		return nearest, near
+	diagIdx := getDiagonalNeighborIndex(mbX, mbY, mbW)
+	if diagIdx >= 0 && mbs[diagIdx].isInter {
+		cand.addCandidate(mbs[diagIdx].mv)
 	}
+}
 
-	// Find the candidate with the highest count
-	bestIdx := 0
-	for i := 1; i < numCandidates; i++ {
-		if counts[i] > counts[bestIdx] {
-			bestIdx = i
-		}
+// getDiagonalNeighborIndex returns the index of the diagonal neighbor MB.
+// Returns -1 if no diagonal neighbor is available.
+func getDiagonalNeighborIndex(mbX, mbY, mbW int) int {
+	if mbX < mbW-1 {
+		return (mbY-1)*mbW + (mbX + 1) // above-right
 	}
-	nearest = candidates[bestIdx]
-
-	// Find the second-best candidate
-	if numCandidates > 1 {
-		secondIdx := -1
-		for i := 0; i < numCandidates; i++ {
-			if i != bestIdx {
-				if secondIdx == -1 || counts[i] > counts[secondIdx] {
-					secondIdx = i
-				}
-			}
-		}
-		if secondIdx >= 0 {
-			near = candidates[secondIdx]
-		}
+	if mbX > 0 {
+		return (mbY-1)*mbW + (mbX - 1) // above-left
 	}
-
-	return nearest, near
+	return -1
 }
 
 // mvCost estimates the bit cost of encoding a motion vector difference.

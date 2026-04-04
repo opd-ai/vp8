@@ -25,20 +25,31 @@ type PartitionWriter struct {
 	partitionCount PartitionCount
 	encoders       []*boolEncoder
 	coeffProbs     *[4][8][3][11]uint8
+	histogram      *CoeffHistogram
 }
 
 // NewPartitionWriter creates a new partition writer with the specified
 // number of partitions and coefficient probabilities.
 func NewPartitionWriter(count PartitionCount, probs *[4][8][3][11]uint8) *PartitionWriter {
+	return NewPartitionWriterWithHistogram(count, probs, nil)
+}
+
+// NewPartitionWriterWithHistogram creates a partition writer with optional histogram.
+func NewPartitionWriterWithHistogram(count PartitionCount, probs *[4][8][3][11]uint8, probCfg *ProbConfig) *PartitionWriter {
 	n := count.NumPartitions()
 	encoders := make([]*boolEncoder, n)
 	for i := range encoders {
 		encoders[i] = newBoolEncoder()
 	}
+	var histogram *CoeffHistogram
+	if probCfg != nil {
+		histogram = probCfg.Histogram
+	}
 	return &PartitionWriter{
 		partitionCount: count,
 		encoders:       encoders,
 		coeffProbs:     probs,
+		histogram:      histogram,
 	}
 }
 
@@ -47,7 +58,11 @@ func NewPartitionWriter(count PartitionCount, probs *[4][8][3][11]uint8) *Partit
 //   - row % numPartitions determines which partition to use.
 func (pw *PartitionWriter) GetTokenEncoder(mbRow int) *TokenEncoder {
 	partIdx := mbRow % pw.partitionCount.NumPartitions()
-	return NewTokenEncoder(pw.encoders[partIdx], pw.coeffProbs)
+	te := NewTokenEncoder(pw.encoders[partIdx], pw.coeffProbs)
+	if pw.histogram != nil {
+		te.SetHistogram(pw.histogram)
+	}
+	return te
 }
 
 // GetEncoder returns the boolean encoder for the specified partition.

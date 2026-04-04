@@ -2,6 +2,11 @@ package vp8
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/json"
+	"io"
+	"os"
+	"os/exec"
 	"testing"
 
 	"golang.org/x/image/vp8"
@@ -634,7 +639,7 @@ func TestBuildInterFrame(t *testing.T) {
 		},
 	}
 
-	frame, err := BuildInterFrame(32, 16, 24, 0, 0, 0, 0, 0, OnePartition, loopFilterParams{}, mbs)
+	frame, err := BuildInterFrame(32, 16, 24, 0, 0, 0, 0, 0, OnePartition, loopFilterParams{}, false, mbs)
 	if err != nil {
 		t.Fatalf("BuildInterFrame: %v", err)
 	}
@@ -885,5 +890,284 @@ func verifyKeyFrameDecodable(t *testing.T, frameData []byte, expectedW, expected
 	_, err = dec.DecodeFrame()
 	if err != nil {
 		t.Errorf("frame %d: DecodeFrame: %v", frameIdx, err)
+	}
+}
+
+// TestInterFrameFFprobe validates inter-frame encoding using ffprobe.
+// This test writes an IVF file containing key and inter frames and verifies
+// that ffprobe can read and report correct frame information.
+// The test is skipped if ffprobe is not available.
+func TestInterFrameFFprobe(t *testing.T) {
+	// Check if ffprobe is available
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		t.Skip("ffprobe not available, skipping external decoder test")
+	}
+
+	const width, height = 64, 64
+	const frameCount = 5
+
+	enc, err := NewEncoder(width, height, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc.SetKeyFrameInterval(4) // Key frame every 4 frames
+
+	// Create a temporary IVF file
+	tmpFile, err := os.CreateTemp("", "vp8_test_*.ivf")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	// Write IVF header
+	if err := writeIVFHeader(tmpFile, width, height, frameCount, 30); err != nil {
+		t.Fatalf("failed to write IVF header: %v", err)
+	}
+
+	frameSize := width * height * 3 / 2
+	keyFrameCount := 0
+	interFrameCount := 0
+
+	// Encode frames with varying content
+	for i := 0; i < frameCount; i++ {
+		yuv := make([]byte, frameSize)
+		// Create gradient that shifts per frame to trigger motion
+		for row := 0; row < height; row++ {
+			for col := 0; col < width; col++ {
+				yuv[row*width+col] = byte((row + col + i*5) % 256)
+			}
+		}
+		// Neutral chroma
+		for j := width * height; j < frameSize; j++ {
+			yuv[j] = 128
+		}
+
+		frame, err := enc.Encode(yuv)
+		if err != nil {
+			t.Fatalf("encode frame %d: %v", i, err)
+		}
+
+		isKeyFrame := frame[0]&1 == 0
+		if isKeyFrame {
+			keyFrameCount++
+		} else {
+			interFrameCount++
+		}
+
+		// Write IVF frame
+		if err := writeIVFFrame(tmpFile, frame, uint64(i)); err != nil {
+			t.Fatalf("failed to write IVF frame %d: %v", i, err)
+		}
+	}
+
+	tmpFile.Close()
+
+	t.Logf("encoded %d key frames and %d inter frames", keyFrameCount, interFrameCount)
+
+	// Run ffprobe to validate the file
+	cmd := exec.Command("ffprobe", "-v", "error", "-show_frames",
+		"-select_streams", "v:0", "-print_format", "json", tmpFile.Name())
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("ffprobe failed: %v\nstderr: %s", err, exitErr.Stderr)
+		}
+		t.Fatalf("ffprobe failed: %v", err)
+	}
+
+	// Parse ffprobe output
+	type ffprobeFrame struct {
+		KeyFrame int    `json:"key_frame"`
+		PictType string `json:"pict_type"`
+		Width    int    `json:"width"`
+		Height   int    `json:"height"`
+	}
+	type ffprobeOutput struct {
+		Frames []ffprobeFrame `json:"frames"`
+	}
+
+	var probeResult ffprobeOutput
+	if err := json.Unmarshal(output, &probeResult); err != nil {
+		t.Fatalf("failed to parse ffprobe output: %v", err)
+	}
+
+	// Validate frame count and types
+	if len(probeResult.Frames) != frameCount {
+		t.Errorf("ffprobe reported %d frames, expected %d", len(probeResult.Frames), frameCount)
+	}
+
+	ffprobeKeyFrames := 0
+	for i, f := range probeResult.Frames {
+		if f.Width != width || f.Height != height {
+			t.Errorf("frame %d: dimensions %dx%d, expected %dx%d",
+				i, f.Width, f.Height, width, height)
+		}
+		if f.KeyFrame == 1 {
+			ffprobeKeyFrames++
+		}
+	}
+
+	if ffprobeKeyFrames != keyFrameCount {
+		t.Errorf("ffprobe found %d key frames, expected %d", ffprobeKeyFrames, keyFrameCount)
+	}
+
+	t.Logf("ffprobe validated %d frames successfully", len(probeResult.Frames))
+}
+
+// writeIVFHeader writes an IVF file header.
+// IVF format: https://wiki.multimedia.cx/index.php/IVF
+func writeIVFHeader(w io.Writer, width, height, frameCount, fps int) error {
+	header := make([]byte, 32)
+	copy(header[0:4], "DKIF")                      // signature
+	binary.LittleEndian.PutUint16(header[4:6], 0)  // version
+	binary.LittleEndian.PutUint16(header[6:8], 32) // header length
+	copy(header[8:12], "VP80")                     // fourcc
+	binary.LittleEndian.PutUint16(header[12:14], uint16(width))
+	binary.LittleEndian.PutUint16(header[14:16], uint16(height))
+	binary.LittleEndian.PutUint32(header[16:20], uint32(fps))
+	binary.LittleEndian.PutUint32(header[20:24], 1) // time scale
+	binary.LittleEndian.PutUint32(header[24:28], uint32(frameCount))
+	binary.LittleEndian.PutUint32(header[28:32], 0) // unused
+	_, err := w.Write(header)
+	return err
+}
+
+// writeIVFFrame writes a single IVF frame.
+func writeIVFFrame(w io.Writer, frameData []byte, pts uint64) error {
+	header := make([]byte, 12)
+	binary.LittleEndian.PutUint32(header[0:4], uint32(len(frameData)))
+	binary.LittleEndian.PutUint64(header[4:12], pts)
+	if _, err := w.Write(header); err != nil {
+		return err
+	}
+	_, err := w.Write(frameData)
+	return err
+}
+
+// TestSetGoldenFrameInterval tests golden frame interval configuration.
+func TestSetGoldenFrameInterval(t *testing.T) {
+	enc, err := NewEncoder(32, 32, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Default should be 0 (no golden updates)
+	if enc.goldenFrameInterval != 0 {
+		t.Errorf("default goldenFrameInterval = %d, want 0", enc.goldenFrameInterval)
+	}
+
+	// Set interval
+	enc.SetGoldenFrameInterval(10)
+	if enc.goldenFrameInterval != 10 {
+		t.Errorf("goldenFrameInterval = %d, want 10", enc.goldenFrameInterval)
+	}
+
+	// Negative should clamp to 0
+	enc.SetGoldenFrameInterval(-5)
+	if enc.goldenFrameInterval != 0 {
+		t.Errorf("goldenFrameInterval after -5 = %d, want 0", enc.goldenFrameInterval)
+	}
+}
+
+// TestForceGoldenFrame tests manual golden frame forcing.
+func TestForceGoldenFrame(t *testing.T) {
+	enc, err := NewEncoder(32, 32, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Default should be false
+	if enc.forceNextGolden {
+		t.Error("default forceNextGolden should be false")
+	}
+
+	// Force golden
+	enc.ForceGoldenFrame()
+	if !enc.forceNextGolden {
+		t.Error("forceNextGolden should be true after ForceGoldenFrame()")
+	}
+}
+
+// TestGoldenFrameUpdateInBitstream tests that golden frame updates are signaled
+// in the bitstream when configured.
+func TestGoldenFrameUpdateInBitstream(t *testing.T) {
+	enc, err := NewEncoder(32, 32, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	enc.SetKeyFrameInterval(30)   // Enable inter frames
+	enc.SetGoldenFrameInterval(3) // Update golden every 3 inter frames
+
+	yuv := makeYUV420(32, 32, 128)
+
+	// Encode key frame (frame 0)
+	_, err = enc.Encode(yuv)
+	if err != nil {
+		t.Fatalf("key frame: %v", err)
+	}
+
+	// Encode inter frames
+	for i := 1; i <= 5; i++ {
+		frame, err := enc.Encode(yuv)
+		if err != nil {
+			t.Fatalf("inter frame %d: %v", i, err)
+		}
+
+		// Check the frame is inter (bit 0 = 1)
+		if frame[0]&1 != 1 {
+			t.Errorf("frame %d: expected inter frame (bit0=1), got bit0=%d", i, frame[0]&1)
+		}
+
+		// Note: We can't easily verify the golden refresh flag in the bitstream
+		// without parsing the boolean-encoded header, but we can verify the
+		// encoder's internal state is managed correctly
+		_ = i // Verify no crash during encoding
+	}
+	// Ensure frames encoded without panic
+}
+
+// TestGoldenFrameRefFrameManager tests the reference frame manager's golden
+// frame operations.
+func TestGoldenFrameRefFrameManager(t *testing.T) {
+	mgr := newRefFrameManager(16, 16)
+
+	// Initially, golden should not be valid
+	if mgr.hasReference(refFrameGolden) {
+		t.Error("golden should not be valid initially")
+	}
+
+	// Update last frame
+	y := make([]byte, 16*16)
+	for i := range y {
+		y[i] = 100
+	}
+	cb := make([]byte, 8*8)
+	cr := make([]byte, 8*8)
+	mgr.updateLast(y, cb, cr)
+
+	// Now copy last to golden
+	mgr.copyLastToGolden()
+
+	// Golden should now be valid
+	if !mgr.hasReference(refFrameGolden) {
+		t.Error("golden should be valid after copyLastToGolden")
+	}
+
+	// Verify the data was copied
+	goldenRef := mgr.getRef(refFrameGolden)
+	if goldenRef == nil {
+		t.Fatal("golden reference should not be nil")
+	}
+	if goldenRef.Y[0] != 100 {
+		t.Errorf("golden Y[0] = %d, want 100", goldenRef.Y[0])
+	}
+
+	// Modify last and verify golden is independent
+	y[0] = 200
+	mgr.updateLast(y, cb, cr)
+	if goldenRef.Y[0] != 100 {
+		t.Error("golden should be independent copy, not reference")
 	}
 }

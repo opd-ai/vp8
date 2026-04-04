@@ -170,124 +170,97 @@ func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
 // the first partition. Inter-frame headers differ from key-frame headers in
 // several ways per RFC 6386 §9.
 func encodeInterFrameHeader(enc *boolEncoder, width, height, qi int, deltas QuantDeltas,
-	partCount PartitionCount, loopFilter loopFilterParams, mbs []macroblock,
+	partCount PartitionCount, loopFilter loopFilterParams, refreshGolden bool, mbs []macroblock,
 ) {
-	// Segmentation (1 bit): disabled
-	enc.putBit(128, false)
+	encodeInterFrameHeaderWithProbs(enc, width, height, qi, deltas, partCount, loopFilter, refreshGolden, mbs, nil)
+}
 
-	// Filter type (1 bit): 0 = normal
-	enc.putBit(128, false)
-	// Loop filter level (6 bits)
-	enc.putLiteral(uint32(loopFilter.level), 6)
-	// Sharpness level (3 bits)
-	enc.putLiteral(uint32(loopFilter.sharpness), 3)
+// encodeInterFrameHeaderWithProbs encodes the inter-frame header with optional probability updates.
+func encodeInterFrameHeaderWithProbs(enc *boolEncoder, width, height, qi int, deltas QuantDeltas,
+	partCount PartitionCount, loopFilter loopFilterParams, refreshGolden bool, mbs []macroblock, probCfg *ProbConfig,
+) {
+	encodeCommonFrameHeader(enc, qi, deltas, partCount, loopFilter)
+	encodeRefFrameFlags(enc, refreshGolden)
+	encodeProbUpdates(enc, probCfg)
+	encodeInterFrameProbs(enc)
+	encodeMVProbUpdates(enc)
+	encodeInterMBModes(enc, width, mbs)
+}
 
-	// Loop filter delta flags (1 bit): 0 = no delta
-	enc.putBit(128, false)
+// encodeRefFrameFlags encodes reference frame refresh and copy flags.
+func encodeRefFrameFlags(enc *boolEncoder, refreshGolden bool) {
+	enc.putBit(128, refreshGolden) // refresh_golden_frame
+	enc.putBit(128, false)         // refresh_alternate_frame
+	enc.putLiteral(0, 2)           // copy_buffer_to_golden
+	enc.putLiteral(0, 2)           // copy_buffer_to_alternate
+	enc.putBit(128, false)         // sign_bias_golden
+	enc.putBit(128, false)         // sign_bias_alternate
+	enc.putBit(128, false)         // refresh_entropy_probs
+	enc.putBit(128, true)          // refresh_last_frame_buffer
+}
 
-	// Number of DCT partitions (2 bits)
-	enc.putLiteral(uint32(partCount), 2)
+// encodeProbUpdates encodes token probability updates if configured.
+func encodeProbUpdates(enc *boolEncoder, probCfg *ProbConfig) {
+	if probCfg != nil && probCfg.NewProbs != nil && probCfg.CurrentProbs != nil {
+		EncodeCoeffProbUpdates(enc, probCfg.CurrentProbs, probCfg.NewProbs)
+	} else {
+		EncodeNoCoeffProbUpdates(enc)
+	}
+}
 
-	// Quantizer index (7 bits)
-	enc.putLiteral(uint32(qi), 7)
-	// Quantizer deltas
-	encodeDelta(enc, deltas.Y1DC)
-	encodeDelta(enc, deltas.Y2DC)
-	encodeDelta(enc, deltas.Y2AC)
-	encodeDelta(enc, deltas.UVDC)
-	encodeDelta(enc, deltas.UVAC)
+// encodeInterFrameProbs encodes the inter-frame specific probability values.
+func encodeInterFrameProbs(enc *boolEncoder) {
+	enc.putBit(128, true)  // mb_no_skip_coeff
+	enc.putLiteral(255, 8) // prob_skip_false
+	enc.putLiteral(63, 8)  // prob_intra
+	enc.putLiteral(128, 8) // prob_last
+	enc.putLiteral(128, 8) // prob_golden
+}
 
-	// Reference frame refresh flags (for inter frames)
-	// refresh_golden_frame (1 bit): 0 = don't refresh
-	enc.putBit(128, false)
-	// refresh_alternate_frame (1 bit): 0 = don't refresh
-	enc.putBit(128, false)
-
-	// Copy buffer flags (when not refreshing):
-	// copy_buffer_to_golden (2 bits): 0 = no copy
-	enc.putLiteral(0, 2)
-	// copy_buffer_to_alternate (2 bits): 0 = no copy
-	enc.putLiteral(0, 2)
-
-	// sign_bias_golden (1 bit): 0
-	enc.putBit(128, false)
-	// sign_bias_alternate (1 bit): 0
-	enc.putBit(128, false)
-
-	// refresh_entropy_probs (1 bit): 0 = don't save probs
-	enc.putBit(128, false)
-
-	// refresh_last_frame_buffer (1 bit): 1 = refresh last buffer
-	enc.putBit(128, true)
-
-	// Token probability updates
-	EncodeNoCoeffProbUpdates(enc)
-
-	// mb_no_skip_coeff (1 bit): 1 = use skip flag
-	enc.putBit(128, true)
-	// prob_skip_false (8 bits)
-	enc.putLiteral(255, 8)
-
-	// prob_intra (8 bits): probability of intra mode within inter frame
-	enc.putLiteral(63, 8)
-
-	// prob_last (8 bits): probability of using last reference vs golden/altref
-	enc.putLiteral(128, 8)
-
-	// prob_golden (8 bits): probability of golden vs altref
-	enc.putLiteral(128, 8)
-
-	// intra_16x16_mode_probs (no update flag) - not transmitted for inter frames
-	// These use the key-frame defaults
-
-	// intra_chroma_mode_probs (no update flag)
-
-	// MV probability update flag (1 bit per component per probability)
-	// For simplicity, signal no MV probability updates
+// encodeMVProbUpdates signals no MV probability updates.
+func encodeMVProbUpdates(enc *boolEncoder) {
 	for i := 0; i < 2; i++ {
 		for j := 0; j < 19; j++ {
-			enc.putBit(128, false) // no update
+			enc.putBit(128, false)
 		}
 	}
+}
 
-	// Calculate MB grid dimensions for context tracking
+// encodeInterMBModes encodes macroblock modes for an inter frame.
+func encodeInterMBModes(enc *boolEncoder, width int, mbs []macroblock) {
 	mbW := (width + 15) / 16
-
-	// Track B_PRED sub-block modes for context across macroblock boundaries.
 	aboveBModes := make([][4]intraBMode, mbW)
 	var leftBModes [4]intraBMode
 
-	// Macroblock modes
 	for mbIdx, mb := range mbs {
 		mbX := mbIdx % mbW
-
-		// Reset left context at the start of each row
 		if mbX == 0 {
 			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
 		}
 
-		// Skip flag
 		enc.putBit(255, mb.skip)
-
-		// Encode macroblock mode
 		encodeInterMBModeWithContext(enc, &mb, aboveBModes[mbX], leftBModes)
+		updateBPredContext(&mb, aboveBModes, leftBModes, mbX)
 
-		// Update B_PRED context for next MB
-		if !mb.isInter && mb.lumaMode == B_PRED {
-			for i := 0; i < 4; i++ {
-				aboveBModes[mbX][i] = mb.bModes[12+i]
-			}
-			for i := 0; i < 4; i++ {
-				leftBModes[i] = mb.bModes[i*4+3]
-			}
-		} else {
-			aboveBModes[mbX] = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
-			leftBModes = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
-		}
-
-		// For intra macroblocks, also encode chroma mode
 		if !mb.isInter {
 			encodeUVMode(enc, mb.chromaMode)
+		}
+	}
+}
+
+// updateBPredContext updates B_PRED context for the next macroblock.
+func updateBPredContext(mb *macroblock, aboveBModes [][4]intraBMode, leftBModes [4]intraBMode, mbX int) {
+	if !mb.isInter && mb.lumaMode == B_PRED {
+		for i := 0; i < 4; i++ {
+			aboveBModes[mbX][i] = mb.bModes[12+i]
+		}
+		for i := 0; i < 4; i++ {
+			leftBModes[i] = mb.bModes[i*4+3]
+		}
+	} else {
+		aboveBModes[mbX] = [4]intraBMode{B_DC_PRED, B_DC_PRED, B_DC_PRED, B_DC_PRED}
+		for i := 0; i < 4; i++ {
+			leftBModes[i] = B_DC_PRED
 		}
 	}
 }
@@ -346,15 +319,27 @@ func encodeInterMBModeWithContext(enc *boolEncoder, mb *macroblock, aboveModes, 
 // Inter frames use a frame tag with key_frame=1 (inter) and do not include
 // the start code or dimensions.
 //
+// If refreshGolden is true, the bitstream signals that the decoder should
+// update its golden reference frame from the reconstructed frame.
+//
 // Reference: RFC 6386 §9.1 (frame tag for inter frames)
 func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int,
-	partCount PartitionCount, loopFilter loopFilterParams, mbs []macroblock,
+	partCount PartitionCount, loopFilter loopFilterParams, refreshGolden bool, mbs []macroblock,
+) ([]byte, error) {
+	return buildInterFrameWithProbs(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta,
+		partCount, loopFilter, refreshGolden, mbs, nil)
+}
+
+// buildInterFrameWithProbs constructs an inter frame with optional probability configuration.
+func buildInterFrameWithProbs(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDelta, uvACDelta int,
+	partCount PartitionCount, loopFilter loopFilterParams, refreshGolden bool, mbs []macroblock, probCfg *ProbConfig,
 ) ([]byte, error) {
 	if width <= 0 || height <= 0 || width%2 != 0 || height%2 != 0 {
 		return nil, errInvalidDimensions
 	}
 
 	mbW := (width + 15) / 16
+	mbH := (height + 15) / 16
 
 	deltas := QuantDeltas{
 		Y1DC: y1DCDelta,
@@ -366,53 +351,12 @@ func BuildInterFrame(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, uvDCDel
 
 	// Encode first partition (inter-frame header + MB modes)
 	partEnc := newBoolEncoder()
-	encodeInterFrameHeader(partEnc, width, height, qi, deltas, partCount, loopFilter, mbs)
+	encodeInterFrameHeaderWithProbs(partEnc, width, height, qi, deltas, partCount, loopFilter, refreshGolden, mbs, probCfg)
 	firstPart := partEnc.flush()
 
-	// Encode residual partitions (same codec as key frames)
-	coeffProbs := DefaultCoeffProbs
-	var residualParts [][]byte
+	// Encode residual partitions using shared helper from bitstream.go
+	residualParts := encodeResidualPartitionsWithProbs(partCount, mbs, mbW, mbH, probCfg)
 
-	if partCount == OnePartition {
-		residualEnc := newBoolEncoder()
-		tokenEnc := NewTokenEncoder(residualEnc, &coeffProbs)
-		encodeResidualPartition(tokenEnc, mbs, mbW)
-		residualParts = [][]byte{residualEnc.flush()}
-	} else {
-		mbH := (height + 15) / 16
-		pw := NewPartitionWriter(partCount, &coeffProbs)
-		encodeResidualMultiPartition(pw, mbs, mbW, mbH)
-		residualParts = pw.Finalize()
-	}
-
-	firstPartSize := len(firstPart)
-
-	// Frame tag (3 bytes, little-endian) for inter frame:
-	//   bits [0]:     frame_type: 1 = inter frame (0 = key frame)
-	//   bits [3:1]:   version = 0
-	//   bits [4]:     show_frame = 1
-	//   bits [23:5]:  first_part_size
-	tag := uint32(1)                  // frame_type = 1 (inter frame)
-	tag |= 0 << 1                     // version = 0
-	tag |= 1 << 4                     // show_frame = 1
-	tag |= uint32(firstPartSize) << 5 // first_part_size
-
-	// Inter frames do NOT have the start code or dimensions
-	partSizes := BuildPartitionSizes(residualParts)
-	residualData := ConcatPartitions(residualParts)
-	totalSize := 3 + firstPartSize + len(partSizes) + len(residualData)
-
-	out := make([]byte, 0, totalSize)
-	out = append(out, byte(tag), byte(tag>>8), byte(tag>>16))
-
-	// First partition data
-	out = append(out, firstPart...)
-
-	// Partition sizes (if multiple partitions)
-	out = append(out, partSizes...)
-
-	// Residual partition data
-	out = append(out, residualData...)
-
-	return out, nil
+	// Build inter frame using shared assembler
+	return assembleInterFrameBitstream(firstPart, residualParts), nil
 }

@@ -5,6 +5,8 @@ package vp8
 type intraBMode uint8
 
 // VP8 4×4 intra prediction sub-modes as defined in RFC 6386 §12.3.
+// The ordering must match golang.org/x/image/vp8 decoder constants:
+// predDC=0, predTM=1, predVE=2, predHE=3, predRD=4, predVR=5, predLD=6, predVL=7, predHD=8, predHU=9
 // Constants use underscore naming (e.g., B_DC_PRED) to match RFC 6386 terminology,
 // deviating from Go's MixedCaps convention for clarity when referencing the spec.
 const (
@@ -16,12 +18,12 @@ const (
 	B_VE_PRED
 	// B_HE_PRED predicts columns using averaged column to the left.
 	B_HE_PRED
-	// B_LD_PRED is southwest (left and down) 45° diagonal prediction.
-	B_LD_PRED
 	// B_RD_PRED is southeast (right and down) 45° diagonal prediction.
 	B_RD_PRED
 	// B_VR_PRED is SSE (vertical right) diagonal prediction.
 	B_VR_PRED
+	// B_LD_PRED is southwest (left and down) 45° diagonal prediction.
+	B_LD_PRED
 	// B_VL_PRED is SSW (vertical left) diagonal prediction.
 	B_VL_PRED
 	// B_HD_PRED is ESE (horizontal down) diagonal prediction.
@@ -99,72 +101,105 @@ func avg3(x, y, z byte) byte {
 
 // extractAbove8 extracts up to 8 pixels from the above array (A[0..7]).
 // The above array has topLeft at index 0 and A[0..n] at indices 1..n+1.
-// If fewer than 8 pixels are available, the last available pixel is repeated.
-// If no above context is available, the default value (127) is used.
 func extractAbove8(above []byte) [8]byte {
 	var A [8]byte
 	if len(above) >= 9 {
-		for i := 0; i < 8; i++ {
-			A[i] = above[i+1]
-		}
+		copy(A[:], above[1:9])
 	} else if len(above) >= 5 {
-		for i := 0; i < 4; i++ {
-			A[i] = above[i+1]
-		}
-		for i := 4; i < 8; i++ {
-			A[i] = A[3]
-		}
+		copy(A[:4], above[1:5])
+		extendLast4(A[:], A[3])
 	} else {
-		for i := range A {
-			A[i] = 127
-		}
+		fill8Bytes(&A, 127)
 	}
 	return A
 }
 
+// extendLast4 fills the last 4 elements with the given value.
+func extendLast4(buf []byte, val byte) {
+	for i := 4; i < 8; i++ {
+		buf[i] = val
+	}
+}
+
+// fill8Bytes fills an 8-byte array with a single value.
+func fill8Bytes(buf *[8]byte, val byte) {
+	for i := range buf {
+		buf[i] = val
+	}
+}
+
 // predict4x4DC fills a 4x4 block with a DC value.
 func predict4x4DC(dst, above, left []byte) {
-	// above[0] is topLeft (P), above[1..4] are A[0..3]
-	haveAbove := len(above) >= 5
-	haveLeft := len(left) >= 4
-
-	var dc byte
-	if !haveAbove && !haveLeft {
-		dc = 128
-	} else if haveAbove && haveLeft {
-		sum := 0
-		for i := 1; i <= 4; i++ {
-			sum += int(above[i])
-		}
-		for i := 0; i < 4; i++ {
-			sum += int(left[i])
-		}
-		dc = byte((sum + 4) >> 3)
-	} else if haveAbove {
-		sum := 0
-		for i := 1; i <= 4; i++ {
-			sum += int(above[i])
-		}
-		dc = byte((sum + 2) >> 2)
-	} else {
-		sum := 0
-		for i := 0; i < 4; i++ {
-			sum += int(left[i])
-		}
-		dc = byte((sum + 2) >> 2)
-	}
-
+	dc := compute4x4DC(above, left)
 	for i := 0; i < 16; i++ {
 		dst[i] = dc
 	}
 }
 
+// compute4x4DC calculates the DC value for 4x4 prediction.
+func compute4x4DC(above, left []byte) byte {
+	haveAbove := len(above) >= 5
+	haveLeft := len(left) >= 4
+
+	if !haveAbove && !haveLeft {
+		return 128
+	}
+	if haveAbove && haveLeft {
+		return computeDCBoth(above, left)
+	}
+	if haveAbove {
+		return computeDCAbove(above)
+	}
+	return computeDCLeft(left)
+}
+
+// computeDCBoth computes DC from both above and left neighbors.
+func computeDCBoth(above, left []byte) byte {
+	sum := 0
+	for i := 1; i <= 4; i++ {
+		sum += int(above[i])
+	}
+	for i := 0; i < 4; i++ {
+		sum += int(left[i])
+	}
+	return byte((sum + 4) >> 3)
+}
+
+// computeDCAbove computes DC from above neighbors only.
+func computeDCAbove(above []byte) byte {
+	sum := 0
+	for i := 1; i <= 4; i++ {
+		sum += int(above[i])
+	}
+	return byte((sum + 2) >> 2)
+}
+
+// computeDCLeft computes DC from left neighbors only.
+func computeDCLeft(left []byte) byte {
+	sum := 0
+	for i := 0; i < 4; i++ {
+		sum += int(left[i])
+	}
+	return byte((sum + 2) >> 2)
+}
+
 // predict4x4TM fills a 4x4 block using TrueMotion prediction.
 func predict4x4TM(dst, above, left []byte) {
-	// above[0] is topLeft (P), above[1..4] are A[0..3]
+	P, A := extract4x4TMAbove(above)
+	L := extract4x4TMLeft(left, &P)
+
+	for r := 0; r < 4; r++ {
+		for c := 0; c < 4; c++ {
+			val := int(L[r]) + int(A[c]) - int(P)
+			dst[r*4+c] = clamp8(val)
+		}
+	}
+}
+
+// extract4x4TMAbove extracts above pixels and top-left for TM prediction.
+func extract4x4TMAbove(above []byte) (byte, [4]byte) {
 	var P byte = 128
 	var A [4]byte
-	var L [4]byte
 
 	if len(above) >= 1 {
 		P = above[0]
@@ -179,26 +214,39 @@ func predict4x4TM(dst, above, left []byte) {
 		}
 		P = 127
 	}
+	return P, A
+}
+
+// extract4x4TMLeft extracts left pixels for TM prediction.
+func extract4x4TMLeft(left []byte, P *byte) [4]byte {
+	var L [4]byte
 	if len(left) >= 4 {
 		copy(L[:], left[:4])
 	} else {
 		for i := range L {
 			L[i] = 129
 		}
-		P = 129
+		*P = 129
 	}
-
-	for r := 0; r < 4; r++ {
-		for c := 0; c < 4; c++ {
-			val := int(L[r]) + int(A[c]) - int(P)
-			dst[r*4+c] = clamp8(val)
-		}
-	}
+	return L
 }
 
 // predict4x4VE fills a 4x4 block using vertical prediction with smoothing.
 func predict4x4VE(dst, above []byte) {
-	// above[0] is P, above[1..4] are A[0..3], above[5] is A[4] for smoothing
+	A := extractAbove5(above)
+	P := extractTopLeft(above)
+
+	row := [4]byte{
+		avg3(P, A[0], A[1]),
+		avg3(A[0], A[1], A[2]),
+		avg3(A[1], A[2], A[3]),
+		avg3(A[2], A[3], A[4]),
+	}
+	fill4x4Rows(dst, row)
+}
+
+// extractAbove5 extracts the 5 above pixels (A[0..4]) for VE prediction.
+func extractAbove5(above []byte) [5]byte {
 	var A [5]byte
 	if len(above) >= 6 {
 		for i := 0; i < 5; i++ {
@@ -208,27 +256,25 @@ func predict4x4VE(dst, above []byte) {
 		for i := 0; i < 4; i++ {
 			A[i] = above[i+1]
 		}
-		A[4] = A[3] // Repeat last if A[4] not available
+		A[4] = A[3]
 	} else {
 		for i := range A {
 			A[i] = 127
 		}
 	}
+	return A
+}
 
-	// Use P (above[0]) for the left edge
-	P := byte(127)
+// extractTopLeft extracts the top-left pixel (P) from the above array.
+func extractTopLeft(above []byte) byte {
 	if len(above) >= 1 {
-		P = above[0]
+		return above[0]
 	}
+	return 127
+}
 
-	// B[0][c] = B[1][c] = B[2][c] = B[3][c] = avg3(A[c-1], A[c], A[c+1])
-	row := [4]byte{
-		avg3(P, A[0], A[1]),
-		avg3(A[0], A[1], A[2]),
-		avg3(A[1], A[2], A[3]),
-		avg3(A[2], A[3], A[4]),
-	}
-
+// fill4x4Rows fills all 4 rows of a 4x4 block with the same row values.
+func fill4x4Rows(dst []byte, row [4]byte) {
 	for r := 0; r < 4; r++ {
 		copy(dst[r*4:r*4+4], row[:])
 	}

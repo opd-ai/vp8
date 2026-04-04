@@ -63,36 +63,54 @@ func Predict16x16(dst, above, left []byte, topLeft byte, mode intraMode) {
 // predict16x16DC fills a 16x16 block with a DC value derived from above/left.
 // Reference: RFC 6386 §12.3 (DC_PRED for luma)
 func predict16x16DC(dst, above, left []byte) {
-	var dc byte
+	dc := compute16x16DC(above, left)
+	for i := 0; i < 256; i++ {
+		dst[i] = dc
+	}
+}
+
+// compute16x16DC calculates the DC value for 16x16 prediction.
+func compute16x16DC(above, left []byte) byte {
 	haveAbove := len(above) >= 16
 	haveLeft := len(left) >= 16
 
 	if !haveAbove && !haveLeft {
-		dc = 128
-	} else if haveAbove && haveLeft {
-		sum := 0
-		for i := 0; i < 16; i++ {
-			sum += int(above[i]) + int(left[i])
-		}
-		dc = byte((sum + 16) >> 5) // average of 32 pixels, rounding
-	} else if haveAbove {
-		sum := 0
-		for i := 0; i < 16; i++ {
-			sum += int(above[i])
-		}
-		dc = byte((sum + 8) >> 4) // average of 16 pixels, rounding
-	} else { // haveLeft
-		sum := 0
-		for i := 0; i < 16; i++ {
-			sum += int(left[i])
-		}
-		dc = byte((sum + 8) >> 4) // average of 16 pixels, rounding
+		return 128
 	}
+	if haveAbove && haveLeft {
+		return compute16x16DCBoth(above, left)
+	}
+	if haveAbove {
+		return compute16x16DCAbove(above)
+	}
+	return compute16x16DCLeft(left)
+}
 
-	// Fill entire 16x16 block with the DC value
-	for i := 0; i < 256; i++ {
-		dst[i] = dc
+// compute16x16DCBoth computes DC from both above and left neighbors.
+func compute16x16DCBoth(above, left []byte) byte {
+	sum := 0
+	for i := 0; i < 16; i++ {
+		sum += int(above[i]) + int(left[i])
 	}
+	return byte((sum + 16) >> 5)
+}
+
+// compute16x16DCAbove computes DC from above neighbors only.
+func compute16x16DCAbove(above []byte) byte {
+	sum := 0
+	for i := 0; i < 16; i++ {
+		sum += int(above[i])
+	}
+	return byte((sum + 8) >> 4)
+}
+
+// compute16x16DCLeft computes DC from left neighbors only.
+func compute16x16DCLeft(left []byte) byte {
+	sum := 0
+	for i := 0; i < 16; i++ {
+		sum += int(left[i])
+	}
+	return byte((sum + 8) >> 4)
 }
 
 // predict16x16V fills a 16x16 block by replicating the row above.
@@ -139,36 +157,38 @@ func predict16x16H(dst, left []byte) {
 // TM_PRED: X[r][c] = clamp(left[r] + above[c] - topLeft)
 // Reference: RFC 6386 §12.3 (TM_PRED for luma)
 func predict16x16TM(dst, above, left []byte, topLeft byte) {
-	// Handle missing neighbors per RFC 6386
-	var aboveRow [16]byte
-	var leftCol [16]byte
-	tl := int(topLeft)
+	aboveRow, tl := prepareAboveContext16(above, topLeft)
+	leftCol, tl := prepareLeftContext16(left, tl)
+	fillTMPrediction(dst, aboveRow[:], leftCol[:], tl, 16)
+}
 
+// prepareAboveContext16 prepares the above row for 16x16 TM prediction.
+func prepareAboveContext16(above []byte, topLeft byte) ([16]byte, int) {
+	var aboveRow [16]byte
+	tl := int(topLeft)
 	if len(above) >= 16 {
 		copy(aboveRow[:], above[:16])
 	} else {
 		for i := range aboveRow {
 			aboveRow[i] = 127
 		}
-		tl = 127 // Also use 127 for topLeft when above is missing
+		tl = 127
 	}
+	return aboveRow, tl
+}
 
+// prepareLeftContext16 prepares the left column for 16x16 TM prediction.
+func prepareLeftContext16(left []byte, tl int) ([16]byte, int) {
+	var leftCol [16]byte
 	if len(left) >= 16 {
 		copy(leftCol[:], left[:16])
 	} else {
 		for i := range leftCol {
 			leftCol[i] = 129
 		}
-		tl = 129 // Use 129 for topLeft when left is missing
+		tl = 129
 	}
-
-	for r := 0; r < 16; r++ {
-		for c := 0; c < 16; c++ {
-			// X[r][c] = clamp(left[r] + above[c] - topLeft)
-			val := int(leftCol[r]) + int(aboveRow[c]) - tl
-			dst[r*16+c] = clamp8(val)
-		}
-	}
+	return leftCol, tl
 }
 
 // Predict8x8Chroma fills an 8x8 chroma prediction buffer using the specified mode.
@@ -197,35 +217,40 @@ func Predict8x8Chroma(dst, above, left []byte, topLeft byte, mode chromaMode) {
 // predict8x8DC fills an 8x8 chroma block with a DC value.
 // Reference: RFC 6386 §12.2
 func predict8x8DC(dst, above, left []byte) {
-	var dc byte
+	dc := compute8x8DC(above, left)
+	fill8x8Block(dst, dc)
+}
+
+// compute8x8DC computes the DC value for 8x8 chroma prediction.
+func compute8x8DC(above, left []byte) byte {
 	haveAbove := len(above) >= 8
 	haveLeft := len(left) >= 8
 
 	if !haveAbove && !haveLeft {
-		dc = 128
-	} else if haveAbove && haveLeft {
-		sum := 0
-		for i := 0; i < 8; i++ {
-			sum += int(above[i]) + int(left[i])
-		}
-		dc = byte((sum + 8) >> 4) // average of 16 pixels, rounding
-	} else if haveAbove {
-		sum := 0
-		for i := 0; i < 8; i++ {
-			sum += int(above[i])
-		}
-		dc = byte((sum + 4) >> 3) // average of 8 pixels, rounding
-	} else { // haveLeft
-		sum := 0
-		for i := 0; i < 8; i++ {
-			sum += int(left[i])
-		}
-		dc = byte((sum + 4) >> 3) // average of 8 pixels, rounding
+		return 128
 	}
+	if haveAbove && haveLeft {
+		return byte((sum8(above) + sum8(left) + 8) >> 4)
+	}
+	if haveAbove {
+		return byte((sum8(above) + 4) >> 3)
+	}
+	return byte((sum8(left) + 4) >> 3)
+}
 
-	// Fill entire 8x8 block with the DC value
+// sum8 computes the sum of the first 8 bytes.
+func sum8(data []byte) int {
+	sum := 0
+	for i := 0; i < 8; i++ {
+		sum += int(data[i])
+	}
+	return sum
+}
+
+// fill8x8Block fills an 8x8 block with a single value.
+func fill8x8Block(dst []byte, val byte) {
 	for i := 0; i < 64; i++ {
-		dst[i] = dc
+		dst[i] = val
 	}
 }
 
@@ -268,10 +293,15 @@ func predict8x8H(dst, left []byte) {
 // predict8x8TM fills an 8x8 chroma block using TrueMotion prediction.
 // Reference: RFC 6386 §12.2
 func predict8x8TM(dst, above, left []byte, topLeft byte) {
-	var aboveRow [8]byte
-	var leftCol [8]byte
-	tl := int(topLeft)
+	aboveRow, tl := prepareAboveContext8(above, topLeft)
+	leftCol, tl := prepareLeftContext8(left, tl)
+	fillTMPrediction(dst, aboveRow[:], leftCol[:], tl, 8)
+}
 
+// prepareAboveContext8 prepares the above row for 8x8 TM prediction.
+func prepareAboveContext8(above []byte, topLeft byte) ([8]byte, int) {
+	var aboveRow [8]byte
+	tl := int(topLeft)
 	if len(above) >= 8 {
 		copy(aboveRow[:], above[:8])
 	} else {
@@ -280,7 +310,12 @@ func predict8x8TM(dst, above, left []byte, topLeft byte) {
 		}
 		tl = 127
 	}
+	return aboveRow, tl
+}
 
+// prepareLeftContext8 prepares the left column for 8x8 TM prediction.
+func prepareLeftContext8(left []byte, tl int) ([8]byte, int) {
+	var leftCol [8]byte
 	if len(left) >= 8 {
 		copy(leftCol[:], left[:8])
 	} else {
@@ -289,11 +324,15 @@ func predict8x8TM(dst, above, left []byte, topLeft byte) {
 		}
 		tl = 129
 	}
+	return leftCol, tl
+}
 
-	for r := 0; r < 8; r++ {
-		for c := 0; c < 8; c++ {
-			val := int(leftCol[r]) + int(aboveRow[c]) - tl
-			dst[r*8+c] = clamp8(val)
+// fillTMPrediction fills a block using TrueMotion prediction formula.
+func fillTMPrediction(dst, above, left []byte, tl, size int) {
+	for r := 0; r < size; r++ {
+		for c := 0; c < size; c++ {
+			val := int(left[r]) + int(above[c]) - tl
+			dst[r*size+c] = clamp8(val)
 		}
 	}
 }

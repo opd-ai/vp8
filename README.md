@@ -116,6 +116,10 @@ Sets the number of DCT partitions (1, 2, 4, or 8).
 
 Fine-tunes per-plane quantization with delta values added to the base quantizer index.
 
+### `(*Encoder) SetProbabilityUpdates(enabled bool)`
+
+Enables or disables adaptive coefficient probability updates. When enabled, the encoder tracks token statistics and updates probability tables in frame headers when doing so improves compression efficiency. Default is false.
+
 ### `NewYUV420Frame(yuv []byte, width, height int) (*Frame, error)`
 
 Wraps a raw I420 buffer in a `Frame` struct for direct use with `BuildKeyFrame`.

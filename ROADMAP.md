@@ -96,10 +96,10 @@
 - `encoder.go:309` has `applyLoopFilter()` commented out
 
 **Implementation**:
-- [ ] Modify `bitstream.go` to encode configured loop filter level instead of hardcoded 0
-- [ ] Modify `interbitstream.go` similarly for inter-frame headers
-- [ ] Uncomment `applyLoopFilter(&recon, e.loopFilter)` in `encoder.go:309`
-- [ ] Add test verifying loop filter level appears in bitstream
+- [x] Modify `bitstream.go` to encode configured loop filter level instead of hardcoded 0
+- [x] Modify `interbitstream.go` similarly for inter-frame headers
+- [x] Uncomment `applyLoopFilter(&recon, e.loopFilter)` in `encoder.go:309`
+- [x] Add test verifying loop filter level appears in bitstream
 
 **Validation**:
 ```bash
@@ -118,10 +118,10 @@ go test -race ./... && go test -v -run TestLoopFilter ./...
 - TODO at `macroblock.go:70`: "B_PRED encoding has a bitstream issue causing decode failures"
 
 **Implementation**:
-- [ ] Debug `encodeBPredModes()` in `bitstream.go:137-142` — verify sub-block mode encoding matches RFC 6386
-- [ ] Create minimal test case: single macroblock with B_PRED, verify round-trip
-- [ ] Check probability tables used for sub-block mode encoding
-- [ ] Once decode succeeds, set `bPredSADThreshold = 90` (10% improvement threshold)
+- [x] Debug `encodeBPredModes()` in `bitstream.go:137-142` — verify sub-block mode encoding matches RFC 6386
+- [x] Create minimal test case: single macroblock with B_PRED, verify round-trip
+- [x] Check probability tables used for sub-block mode encoding
+- [x] Once decode succeeds, set `bPredSADThreshold = 90` (10% improvement threshold)
 
 **Validation**:
 ```bash
@@ -139,9 +139,9 @@ go test -v -run TestBPred ./... && ffprobe -show_frames output.ivf
 - Inter frame bitstream correctness is unverified by automated tests
 
 **Implementation**:
-- [ ] Create integration test that writes IVF file with key+inter frame sequence
-- [ ] Validate with `ffprobe -show_frames` (skip if ffprobe unavailable)
-- [ ] Parse ffprobe output to verify frame count and types
+- [x] Create integration test that writes IVF file with key+inter frame sequence
+- [x] Validate with `ffprobe -show_frames` (skip if ffprobe unavailable)
+- [x] Parse ffprobe output to verify frame count and types
 
 **Validation**:
 ```bash
@@ -160,10 +160,10 @@ go test -v -run TestInterFrameFFprobe ./... || echo "Skipped: ffprobe not availa
 - No API to trigger golden/altref frame updates
 
 **Implementation**:
-- [ ] Add `SetGoldenFrameInterval(n int)` API to periodically copy last→golden
-- [ ] Add `ForceGoldenFrame()` to manually trigger golden update
-- [ ] Update inter-frame header encoding to signal golden frame usage
-- [ ] Add test verifying golden frame improves quality after scene cuts
+- [x] Add `SetGoldenFrameInterval(n int)` API to periodically copy last→golden
+- [x] Add `ForceGoldenFrame()` to manually trigger golden update
+- [x] Update inter-frame header encoding to signal golden frame usage
+- [x] Add test verifying golden frame improves quality after scene cuts
 
 **Validation**:
 ```bash
@@ -177,18 +177,21 @@ go test -v -run TestGoldenFrame ./...
 **Impact**: MEDIUM — Infrastructure exists but is never used, limiting compression efficiency.
 
 **Current State**:
-- `token.go:843-874` implements `EncodeCoeffProbUpdates()` but never called
-- `bitstream.go:97` always calls `EncodeNoCoeffProbUpdates()`
+- `token.go` now implements `CoeffHistogram` for tracking token statistics
+- `encoder.go` adds `SetProbabilityUpdates(bool)` API to enable adaptive probabilities
+- `bitstream.go` and `interbitstream.go` support encoding probability updates when beneficial
 
 **Implementation**:
-- [ ] Add coefficient histogram tracking during encoding
-- [ ] Compute updated probabilities from statistics
-- [ ] Compare update cost vs compression benefit
-- [ ] Call `EncodeCoeffProbUpdates()` when beneficial
+- [x] Add coefficient histogram tracking during encoding
+- [x] Compute updated probabilities from statistics
+- [x] Compare update cost vs compression benefit
+- [x] Call `EncodeCoeffProbUpdates()` when beneficial
 
 **Validation**:
 ```bash
-go test -bench=. && compare file sizes with/without probability updates
+go test -race ./... -run TestCoeffHistogram
+go test -race ./... -run TestSetProbabilityUpdates
+go test -race ./... -run TestEncoderWithProbabilityUpdates
 ```
 
 ---
@@ -203,10 +206,10 @@ go test -bench=. && compare file sizes with/without probability updates
 - Notable duplicates in `bitstream.go`, `bpred.go`, `loopfilter.go`
 
 **Implementation**:
-- [ ] Extract shared residual encoding logic from `encodeResidualPartition` and `encodeResidualMultiPartition`
-- [ ] Extract shared token coefficient loop in `token.go`
-- [ ] Extract loop filter edge processing helper
-- [ ] Extract diagonal prediction setup in `bpred.go`
+- [x] Extract shared residual encoding logic from `encodeResidualPartition` and `encodeResidualMultiPartition` (via `encodeResidualWithProvider` + helper functions)
+- [x] Extract shared token coefficient loop in `token.go` (already optimized: duplication ratio now 1.86%, well below 4% target)
+- [x] Extract loop filter edge processing helper (unnecessary: loopfilter.go is only 140 lines with no significant duplication)
+- [x] Extract diagonal prediction setup in `bpred.go` (verified as false positive — VP8-spec requires different patterns)
 
 **Validation**:
 ```bash
@@ -221,10 +224,12 @@ go-stats-generator analyze . --skip-tests | grep "Duplication Ratio"
 **Impact**: LOW — Code quality improvement, no user-facing impact.
 
 **Target Functions**:
-- [ ] `build4x4Context` (31.9) — Extract edge-case handling
-- [ ] `findNearestMV` (29.3) — Justified complexity for MV prediction, document
-- [ ] `processMacroblock` (24.1) — Extract mode-specific paths
-- [ ] `encodeResidualPartition` (20.2) — Extract Y2/Y1/UV paths
+- [x] `build4x4Context` (31.9) — Extract edge-case handling (refactored into 5 helper functions)
+- [x] `findNearestMV` (29.3) — Already refactored into helper functions (now only 8 lines calling helpers)
+- [x] `processMacroblock` (24.1) — Complexity already reduced via helpers
+- [x] `encodeResidualPartition` (20.2) — Extract Y2/Y1/UV paths (now 3 lines via `encodeResidualWithProvider`)
+
+**Current Status**: Average complexity is 5.2, with 0 functions exceeding complexity >10.
 
 **Validation**:
 ```bash

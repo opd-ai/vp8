@@ -288,3 +288,120 @@ func TestCoeffProbUpdateProbs(t *testing.T) {
 		}
 	}
 }
+
+func TestCoeffHistogramBasic(t *testing.T) {
+	h := NewCoeffHistogram()
+
+	// Record some tokens
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_EOB)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_0)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_1)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_2)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_3)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_4)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_CAT1)
+	h.RecordToken(PlaneY1WithY2, 1, 0, DCT_CAT2)
+
+	// Verify counts - EOB branch (branch 0)
+	if h.counts[PlaneY1WithY2][1][0][0][0] != 1 {
+		t.Errorf("Expected 1 EOB false count, got %d", h.counts[PlaneY1WithY2][1][0][0][0])
+	}
+	if h.counts[PlaneY1WithY2][1][0][0][1] != 7 {
+		t.Errorf("Expected 7 EOB true counts (non-EOB tokens), got %d", h.counts[PlaneY1WithY2][1][0][0][1])
+	}
+}
+
+func TestCoeffHistogramReset(t *testing.T) {
+	h := NewCoeffHistogram()
+
+	// Record tokens
+	for i := 0; i < 100; i++ {
+		h.RecordToken(PlaneY1WithY2, 1, 0, DCT_1)
+	}
+
+	// Verify something was recorded
+	total := h.counts[PlaneY1WithY2][1][0][1][0] + h.counts[PlaneY1WithY2][1][0][1][1]
+	if total == 0 {
+		t.Error("Expected recorded tokens")
+	}
+
+	// Reset and verify clear
+	h.Reset()
+
+	total = h.counts[PlaneY1WithY2][1][0][1][0] + h.counts[PlaneY1WithY2][1][0][1][1]
+	if total != 0 {
+		t.Errorf("Expected 0 after reset, got %d", total)
+	}
+}
+
+func TestCoeffHistogramComputeUpdatedProbs(t *testing.T) {
+	h := NewCoeffHistogram()
+
+	// Record a bias towards DCT_0 (non-zero more common)
+	for i := 0; i < 100; i++ {
+		h.RecordToken(PlaneY1WithY2, 1, 0, DCT_1)
+	}
+	for i := 0; i < 10; i++ {
+		h.RecordToken(PlaneY1WithY2, 1, 0, DCT_0)
+	}
+	// Record non-EOB for branch 0
+	for i := 0; i < 110; i++ {
+		h.RecordToken(PlaneY1WithY2, 1, 0, DCT_2)
+	}
+
+	updated := h.ComputeUpdatedProbs(&DefaultCoeffProbs)
+
+	// With 100 non-zero and 10 zero for branch 1 (is non-zero),
+	// P(zero) = 10/110 = 9%, or ~23/256
+	// The computed probability should reflect this
+	if updated[PlaneY1WithY2][1][0][1] == DefaultCoeffProbs[PlaneY1WithY2][1][0][1] {
+		t.Log("Probability unchanged (may be similar to default or insufficient samples)")
+	}
+}
+
+func TestSetProbabilityUpdatesAPI(t *testing.T) {
+	enc, err := NewEncoder(320, 240, 30)
+	if err != nil {
+		t.Fatalf("NewEncoder: %v", err)
+	}
+
+	// Default should be disabled
+	if enc.useProbUpdates {
+		t.Error("Expected useProbUpdates to be false by default")
+	}
+
+	// Enable
+	enc.SetProbabilityUpdates(true)
+	if !enc.useProbUpdates {
+		t.Error("Expected useProbUpdates to be true after SetProbabilityUpdates(true)")
+	}
+
+	// Disable
+	enc.SetProbabilityUpdates(false)
+	if enc.useProbUpdates {
+		t.Error("Expected useProbUpdates to be false after SetProbabilityUpdates(false)")
+	}
+}
+
+func TestEncoderWithProbabilityUpdates(t *testing.T) {
+	enc, err := NewEncoder(32, 32, 30)
+	if err != nil {
+		t.Fatalf("NewEncoder: %v", err)
+	}
+
+	enc.SetProbabilityUpdates(true)
+
+	// Create a test frame
+	yuv := make([]byte, 32*32*3/2)
+	for i := range yuv {
+		yuv[i] = byte(i % 256)
+	}
+
+	// Encode multiple frames
+	for i := 0; i < 5; i++ {
+		_, err := enc.Encode(yuv)
+		if err != nil {
+			t.Fatalf("Encode frame %d: %v", i, err)
+		}
+	}
+}

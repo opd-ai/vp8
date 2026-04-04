@@ -92,135 +92,77 @@ func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
 // processInterYBlocks processes Y blocks using motion-compensated prediction.
 // Similar to processYBlocks16x16 but uses the MC prediction instead of intra.
 func processInterYBlocks(srcY, predY []byte, mb *macroblock, qf QuantFactors) {
-	var dcValues [16]int16
+	dcValues := processInterLumaBlocksWithDC(srcY, predY, mb, qf)
+	applyWHTAndFinalize(dcValues, mb, qf)
+}
 
+// processInterLumaBlocksWithDC processes 16 inter luma 4x4 blocks and returns DC values.
+func processInterLumaBlocksWithDC(srcY, predY []byte, mb *macroblock, qf QuantFactors) [16]int16 {
+	var dcValues [16]int16
 	for by := 0; by < 4; by++ {
 		for bx := 0; bx < 4; bx++ {
 			blockIdx := by*4 + bx
-
-			// Extract 4x4 source block
-			var src4x4, pred4x4 [16]byte
-			for row := 0; row < 4; row++ {
-				srcRow := (by*4 + row) * 16
-				copy(src4x4[row*4:row*4+4], srcY[srcRow+bx*4:srcRow+bx*4+4])
-				copy(pred4x4[row*4:row*4+4], predY[srcRow+bx*4:srcRow+bx*4+4])
-			}
-
-			residual := ComputeResidual(src4x4[:], pred4x4[:])
-			dctCoeffs := ForwardDCT4x4(residual[:])
-			dcValues[blockIdx] = dctCoeffs[0]
-			quantized := QuantizeBlock(dctCoeffs, qf.Y1DC, qf.Y1AC)
-			mb.yCoeffs[blockIdx] = ToZigzag(quantized)
-
-			for i := 1; i < 16; i++ {
-				if mb.yCoeffs[blockIdx][i] != 0 {
-					mb.skip = false
-				}
-			}
+			src4x4 := extract4x4Block(srcY, by, bx)
+			pred4x4 := extract4x4Block(predY, by, bx)
+			dcValues[blockIdx] = processInterLuma4x4Block(src4x4, pred4x4, mb, blockIdx, qf)
 		}
 	}
+	return dcValues
+}
 
-	// WHT of DC values
-	whtCoeffs := ForwardWHT4x4(dcValues)
-	quantizedWHT := QuantizeBlock(whtCoeffs, qf.Y2DC, qf.Y2AC)
-	mb.y2Coeffs = ToZigzag(quantizedWHT)
+// processInterLuma4x4Block processes a single 4x4 inter luma block, returning its DC value.
+func processInterLuma4x4Block(src4x4, pred4x4 [16]byte, mb *macroblock, blockIdx int, qf QuantFactors) int16 {
+	residual := ComputeResidual(src4x4[:], pred4x4[:])
+	dctCoeffs := ForwardDCT4x4(residual[:])
+	quantized := QuantizeBlock(dctCoeffs, qf.Y1DC, qf.Y1AC)
+	mb.yCoeffs[blockIdx] = ToZigzag(quantized)
 
-	// Clear DC from Y blocks (encoded via Y2)
-	for i := 0; i < 16; i++ {
-		mb.yCoeffs[i][0] = 0
+	if hasNonZeroACCoeffs(mb.yCoeffs[blockIdx]) {
+		mb.skip = false
 	}
+	return dctCoeffs[0]
+}
 
-	for i := 0; i < 16; i++ {
-		if mb.y2Coeffs[i] != 0 {
-			mb.skip = false
+// processInterChromaBlocks processes chroma blocks with MC prediction.
+// Uses processChroma4x4WithPred for shared block processing logic.
+func processInterChromaBlocks(src, pred []byte, mb *macroblock, qf QuantFactors, isU bool) {
+	coeffs := mb.uCoeffs[:]
+	if !isU {
+		coeffs = mb.vCoeffs[:]
+	}
+	for by := 0; by < 2; by++ {
+		for bx := 0; bx < 2; bx++ {
+			processChroma4x4WithPred(src, pred, by, bx, coeffs, &mb.skip, qf)
 		}
 	}
 }
 
-// processInterChromaBlocks processes chroma blocks with MC prediction.
-func processInterChromaBlocks(src, pred []byte, mb *macroblock, qf QuantFactors, isU bool) {
-	for by := 0; by < 2; by++ {
-		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
+// processChroma4x4WithPred processes a single 4x4 chroma block with given prediction.
+// Shared helper for both inter and intra chroma processing.
+func processChroma4x4WithPred(src, pred []byte, by, bx int, coeffs [][16]int16, skip *bool, qf QuantFactors) {
+	blockIdx := by*2 + bx
 
-			var src4x4, pred4x4 [16]byte
-			for row := 0; row < 4; row++ {
-				srcRow := (by*4 + row) * 8
-				copy(src4x4[row*4:row*4+4], src[srcRow+bx*4:srcRow+bx*4+4])
-				copy(pred4x4[row*4:row*4+4], pred[srcRow+bx*4:srcRow+bx*4+4])
-			}
+	var src4x4, pred4x4 [16]byte
+	for row := 0; row < 4; row++ {
+		srcRow := (by*4 + row) * 8
+		copy(src4x4[row*4:row*4+4], src[srcRow+bx*4:srcRow+bx*4+4])
+		copy(pred4x4[row*4:row*4+4], pred[srcRow+bx*4:srcRow+bx*4+4])
+	}
 
-			residual := ComputeResidual(src4x4[:], pred4x4[:])
-			dctCoeffs := ForwardDCT4x4(residual[:])
-			quantized := QuantizeBlock(dctCoeffs, qf.UVDC, qf.UVAC)
+	residual := ComputeResidual(src4x4[:], pred4x4[:])
+	dctCoeffs := ForwardDCT4x4(residual[:])
+	quantized := QuantizeBlock(dctCoeffs, qf.UVDC, qf.UVAC)
+	coeffs[blockIdx] = ToZigzag(quantized)
 
-			if isU {
-				mb.uCoeffs[blockIdx] = ToZigzag(quantized)
-				for i := 0; i < 16; i++ {
-					if mb.uCoeffs[blockIdx][i] != 0 {
-						mb.skip = false
-					}
-				}
-			} else {
-				mb.vCoeffs[blockIdx] = ToZigzag(quantized)
-				for i := 0; i < 16; i++ {
-					if mb.vCoeffs[blockIdx][i] != 0 {
-						mb.skip = false
-					}
-				}
-			}
-		}
+	if hasNonZeroCoeffs(coeffs[blockIdx][:]) {
+		*skip = false
 	}
 }
 
 // processIntraChromaInInterFrame processes chroma blocks using intra prediction
 // within an inter frame. This is used when a macroblock falls back to intra mode.
+// Reuses processChromaPlane from macroblock.go for code sharing.
 func processIntraChromaInInterFrame(srcU, srcV []byte, ctx *mbContext, mb *macroblock, qf QuantFactors) {
-	// U plane
-	var predU [64]byte
-	Predict8x8Chroma(predU[:], ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU, mb.chromaMode)
-	for by := 0; by < 2; by++ {
-		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
-			var src4x4, pred4x4 [16]byte
-			for row := 0; row < 4; row++ {
-				srcRow := (by*4 + row) * 8
-				copy(src4x4[row*4:row*4+4], srcU[srcRow+bx*4:srcRow+bx*4+4])
-				copy(pred4x4[row*4:row*4+4], predU[srcRow+bx*4:srcRow+bx*4+4])
-			}
-			residual := ComputeResidual(src4x4[:], pred4x4[:])
-			dctCoeffs := ForwardDCT4x4(residual[:])
-			quantized := QuantizeBlock(dctCoeffs, qf.UVDC, qf.UVAC)
-			mb.uCoeffs[blockIdx] = ToZigzag(quantized)
-			for i := 0; i < 16; i++ {
-				if mb.uCoeffs[blockIdx][i] != 0 {
-					mb.skip = false
-				}
-			}
-		}
-	}
-
-	// V plane
-	var predV [64]byte
-	Predict8x8Chroma(predV[:], ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV, mb.chromaMode)
-	for by := 0; by < 2; by++ {
-		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
-			var src4x4, pred4x4 [16]byte
-			for row := 0; row < 4; row++ {
-				srcRow := (by*4 + row) * 8
-				copy(src4x4[row*4:row*4+4], srcV[srcRow+bx*4:srcRow+bx*4+4])
-				copy(pred4x4[row*4:row*4+4], predV[srcRow+bx*4:srcRow+bx*4+4])
-			}
-			residual := ComputeResidual(src4x4[:], pred4x4[:])
-			dctCoeffs := ForwardDCT4x4(residual[:])
-			quantized := QuantizeBlock(dctCoeffs, qf.UVDC, qf.UVAC)
-			mb.vCoeffs[blockIdx] = ToZigzag(quantized)
-			for i := 0; i < 16; i++ {
-				if mb.vCoeffs[blockIdx][i] != 0 {
-					mb.skip = false
-				}
-			}
-		}
-	}
+	processChromaPlane(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU, mb.chromaMode, mb.uCoeffs[:], &mb.skip, qf)
+	processChromaPlane(srcV, ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV, mb.chromaMode, mb.vCoeffs[:], &mb.skip, qf)
 }

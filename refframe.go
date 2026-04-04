@@ -220,69 +220,72 @@ func buildReconContext(recon *refFrameBuffer, mbX, mbY, width, height, chromaW i
 	ctx := &mbContext{}
 	chromaH := height / 2
 
+	buildReconLumaContext(ctx, recon.Y, mbX, mbY, width, height)
+	buildReconChromaContext(ctx, recon.Cb, recon.Cr, mbX, mbY, chromaW, chromaH)
+
+	return ctx
+}
+
+// buildReconLumaContext fills the luma neighbor context from reconstructed frame.
+func buildReconLumaContext(ctx *mbContext, y []byte, mbX, mbY, width, height int) {
 	if mbY > 0 {
-		aboveRow := mbY*16 - 1
-		for i := 0; i < 16; i++ {
-			col := mbX*16 + i
-			if col < width {
-				ctx.lumaAboveBuf[i] = recon.Y[aboveRow*width+col]
-			}
-		}
+		aboveRow := (mbY*16 - 1) * width
+		fillAboveRowRecon(ctx.lumaAboveBuf[:], y, mbX*16, aboveRow, width, 16)
 		ctx.lumaAbove = ctx.lumaAboveBuf[:]
 	}
-
 	if mbX > 0 {
-		leftCol := mbX*16 - 1
-		for i := 0; i < 16; i++ {
-			row := mbY*16 + i
-			if row < height {
-				ctx.lumaLeftBuf[i] = recon.Y[row*width+leftCol]
-			}
-		}
+		fillLeftColRecon(ctx.lumaLeftBuf[:], y, mbX*16-1, mbY*16, width, height, 16)
 		ctx.lumaLeft = ctx.lumaLeftBuf[:]
 	}
+	ctx.lumaTopLeft = computeReconTopLeft(y, mbX*16, mbY*16, width, mbX > 0 && mbY > 0)
+}
 
-	if mbX > 0 && mbY > 0 {
-		ctx.lumaTopLeft = recon.Y[(mbY*16-1)*width+(mbX*16-1)]
-	} else {
-		ctx.lumaTopLeft = 128
-	}
-
+// buildReconChromaContext fills the chroma neighbor context from reconstructed frame.
+func buildReconChromaContext(ctx *mbContext, cb, cr []byte, mbX, mbY, chromaW, chromaH int) {
 	if mbY > 0 {
-		aboveRow := mbY*8 - 1
-		for i := 0; i < 8; i++ {
-			col := mbX*8 + i
-			if col < chromaW {
-				ctx.chromaAboveUBuf[i] = recon.Cb[aboveRow*chromaW+col]
-				ctx.chromaAboveVBuf[i] = recon.Cr[aboveRow*chromaW+col]
-			}
-		}
+		aboveRow := (mbY*8 - 1) * chromaW
+		fillAboveRowRecon(ctx.chromaAboveUBuf[:], cb, mbX*8, aboveRow, chromaW, 8)
+		fillAboveRowRecon(ctx.chromaAboveVBuf[:], cr, mbX*8, aboveRow, chromaW, 8)
 		ctx.chromaAboveU = ctx.chromaAboveUBuf[:]
 		ctx.chromaAboveV = ctx.chromaAboveVBuf[:]
 	}
-
 	if mbX > 0 {
-		leftCol := mbX*8 - 1
-		for i := 0; i < 8; i++ {
-			row := mbY*8 + i
-			if row < chromaH {
-				ctx.chromaLeftUBuf[i] = recon.Cb[row*chromaW+leftCol]
-				ctx.chromaLeftVBuf[i] = recon.Cr[row*chromaW+leftCol]
-			}
-		}
+		fillLeftColRecon(ctx.chromaLeftUBuf[:], cb, mbX*8-1, mbY*8, chromaW, chromaH, 8)
+		fillLeftColRecon(ctx.chromaLeftVBuf[:], cr, mbX*8-1, mbY*8, chromaW, chromaH, 8)
 		ctx.chromaLeftU = ctx.chromaLeftUBuf[:]
 		ctx.chromaLeftV = ctx.chromaLeftVBuf[:]
 	}
+	hasCorner := mbX > 0 && mbY > 0
+	ctx.chromaTopLeftU = computeReconTopLeft(cb, mbX*8, mbY*8, chromaW, hasCorner)
+	ctx.chromaTopLeftV = computeReconTopLeft(cr, mbX*8, mbY*8, chromaW, hasCorner)
+}
 
-	if mbX > 0 && mbY > 0 {
-		ctx.chromaTopLeftU = recon.Cb[(mbY*8-1)*chromaW+(mbX*8-1)]
-		ctx.chromaTopLeftV = recon.Cr[(mbY*8-1)*chromaW+(mbX*8-1)]
-	} else {
-		ctx.chromaTopLeftU = 128
-		ctx.chromaTopLeftV = 128
+// fillAboveRowRecon fills the above row buffer from the reconstructed plane.
+func fillAboveRowRecon(buf, src []byte, startCol, rowOffset, planeW, count int) {
+	for i := 0; i < count; i++ {
+		col := startCol + i
+		if col < planeW {
+			buf[i] = src[rowOffset+col]
+		}
 	}
+}
 
-	return ctx
+// fillLeftColRecon fills the left column buffer from the reconstructed plane.
+func fillLeftColRecon(buf, src []byte, col, startRow, planeW, planeH, count int) {
+	for i := 0; i < count; i++ {
+		row := startRow + i
+		if row < planeH {
+			buf[i] = src[row*planeW+col]
+		}
+	}
+}
+
+// computeReconTopLeft returns the top-left pixel or default value.
+func computeReconTopLeft(src []byte, x, y, planeW int, hasCorner bool) byte {
+	if hasCorner {
+		return src[(y-1)*planeW+(x-1)]
+	}
+	return 128
 }
 
 // reconstructLuma16x16 reconstructs luma using 16x16 prediction mode.
@@ -295,32 +298,36 @@ func reconstructLuma16x16(recon *refFrameBuffer, mb *macroblock, ctx *mbContext,
 	dequantWHT := DequantizeBlock(FromZigzag(mb.y2Coeffs), qf.Y2DC, qf.Y2AC)
 	dcValues := InverseWHT4x4(dequantWHT)
 
+	// Reconstruct all 16 4x4 luma blocks using shared helper
 	for by := 0; by < 4; by++ {
 		for bx := 0; bx < 4; bx++ {
-			blockIdx := by*4 + bx
+			reconstructLuma4x4WithDC(recon, mb, predY[:], dcValues, by, bx, mbX, mbY, width, qf)
+		}
+	}
+}
 
-			// Dequantize AC coefficients
-			zigzagCoeffs := mb.yCoeffs[blockIdx]
-			rasterCoeffs := FromZigzag(zigzagCoeffs)
-			// Replace DC with value from WHT
-			rasterCoeffs[0] = dcValues[blockIdx]
-			dequantized := DequantizeBlock(rasterCoeffs, qf.Y1DC, qf.Y1AC)
-			// But DC was already dequantized through WHT, so use it directly
-			dequantized[0] = dcValues[blockIdx]
+// reconstructLuma4x4WithDC reconstructs a single 4x4 luma block with DC from WHT.
+// Shared helper for both intra 16x16 and inter reconstruction.
+func reconstructLuma4x4WithDC(recon *refFrameBuffer, mb *macroblock, predY []byte, dcValues [16]int16, by, bx, mbX, mbY, width int, qf QuantFactors) {
+	blockIdx := by*4 + bx
 
-			invDCT := InverseDCT4x4(dequantized)
+	zigzagCoeffs := mb.yCoeffs[blockIdx]
+	rasterCoeffs := FromZigzag(zigzagCoeffs)
+	rasterCoeffs[0] = dcValues[blockIdx]
+	dequantized := DequantizeBlock(rasterCoeffs, qf.Y1DC, qf.Y1AC)
+	// DC was dequantized through WHT, use it directly
+	dequantized[0] = dcValues[blockIdx]
 
-			// Add prediction to residual and store in recon
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*16 + by*4 + row
-					px := mbX*16 + bx*4 + col
-					if py < recon.Height && px < width {
-						predIdx := (by*4+row)*16 + bx*4 + col
-						val := int(predY[predIdx]) + int(invDCT[row*4+col])
-						recon.Y[py*width+px] = clamp8(val)
-					}
-				}
+	invDCT := InverseDCT4x4(dequantized)
+
+	for row := 0; row < 4; row++ {
+		for col := 0; col < 4; col++ {
+			py := mbY*16 + by*4 + row
+			px := mbX*16 + bx*4 + col
+			if py < recon.Height && px < width {
+				predIdx := (by*4+row)*16 + bx*4 + col
+				val := int(predY[predIdx]) + int(invDCT[row*4+col])
+				recon.Y[py*width+px] = clamp8(val)
 			}
 		}
 	}
@@ -370,49 +377,38 @@ func reconstructChroma(recon *refFrameBuffer, mb *macroblock, ctx *mbContext, mb
 	// U plane
 	var predU [64]byte
 	Predict8x8Chroma(predU[:], ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU, mb.chromaMode)
-
-	for by := 0; by < 2; by++ {
-		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
-			rasterCoeffs := FromZigzag(mb.uCoeffs[blockIdx])
-			dequantized := DequantizeBlock(rasterCoeffs, qf.UVDC, qf.UVAC)
-			invDCT := InverseDCT4x4(dequantized)
-
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*8 + by*4 + row
-					px := mbX*8 + bx*4 + col
-					if py < chromaH && px < chromaW {
-						predIdx := (by*4+row)*8 + bx*4 + col
-						val := int(predU[predIdx]) + int(invDCT[row*4+col])
-						recon.Cb[py*chromaW+px] = clamp8(val)
-					}
-				}
-			}
-		}
-	}
+	reconstructChromaPlane(recon.Cb, mb.uCoeffs[:], predU[:], mbX, mbY, chromaW, chromaH, qf)
 
 	// V plane
 	var predV [64]byte
 	Predict8x8Chroma(predV[:], ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV, mb.chromaMode)
+	reconstructChromaPlane(recon.Cr, mb.vCoeffs[:], predV[:], mbX, mbY, chromaW, chromaH, qf)
+}
 
+// reconstructChromaPlane reconstructs a single chroma plane (U or V).
+func reconstructChromaPlane(dst []byte, coeffs [][16]int16, pred []byte, mbX, mbY, chromaW, chromaH int, qf QuantFactors) {
 	for by := 0; by < 2; by++ {
 		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
-			rasterCoeffs := FromZigzag(mb.vCoeffs[blockIdx])
-			dequantized := DequantizeBlock(rasterCoeffs, qf.UVDC, qf.UVAC)
-			invDCT := InverseDCT4x4(dequantized)
+			reconstructChroma4x4(dst, coeffs, pred, by, bx, mbX, mbY, chromaW, chromaH, qf)
+		}
+	}
+}
 
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*8 + by*4 + row
-					px := mbX*8 + bx*4 + col
-					if py < chromaH && px < chromaW {
-						predIdx := (by*4+row)*8 + bx*4 + col
-						val := int(predV[predIdx]) + int(invDCT[row*4+col])
-						recon.Cr[py*chromaW+px] = clamp8(val)
-					}
-				}
+// reconstructChroma4x4 reconstructs a single 4x4 chroma block.
+func reconstructChroma4x4(dst []byte, coeffs [][16]int16, pred []byte, by, bx, mbX, mbY, chromaW, chromaH int, qf QuantFactors) {
+	blockIdx := by*2 + bx
+	rasterCoeffs := FromZigzag(coeffs[blockIdx])
+	dequantized := DequantizeBlock(rasterCoeffs, qf.UVDC, qf.UVAC)
+	invDCT := InverseDCT4x4(dequantized)
+
+	for row := 0; row < 4; row++ {
+		for col := 0; col < 4; col++ {
+			py := mbY*8 + by*4 + row
+			px := mbX*8 + bx*4 + col
+			if py < chromaH && px < chromaW {
+				predIdx := (by*4+row)*8 + bx*4 + col
+				val := int(pred[predIdx]) + int(invDCT[row*4+col])
+				dst[py*chromaW+px] = clamp8(val)
 			}
 		}
 	}
@@ -423,47 +419,35 @@ func reconstructChroma(recon *refFrameBuffer, mb *macroblock, ctx *mbContext, mb
 func reconstructInterMB(recon *refFrameBuffer, mb *macroblock, mbX, mbY, width, height, chromaW int, qf QuantFactors, ref *refFrameManager) {
 	refBuf := ref.getRef(mb.refFrame)
 	if refBuf == nil {
-		// Fallback to intra if reference is not available
 		reconstructIntraMB(recon, mb, mbX, mbY, width, height, chromaW, qf)
 		return
 	}
 
-	// Motion-compensated prediction for luma
+	// Reconstruct luma with motion compensation
+	reconstructInterLuma(recon, mb, refBuf, mbX, mbY, width, height, qf)
+
+	// Reconstruct chroma with halved MV
+	reconstructInterChroma(recon, mb, refBuf, mbX, mbY, width, height, chromaW, qf)
+}
+
+// reconstructInterLuma reconstructs luma blocks using motion-compensated prediction.
+func reconstructInterLuma(recon *refFrameBuffer, mb *macroblock, refBuf *refFrameBuffer, mbX, mbY, width, height int, qf QuantFactors) {
 	var predY [256]byte
 	motionCompensate16x16(predY[:], refBuf.Y, width, height, mbX*16, mbY*16, mb.mv)
 
-	// Dequantize and add residual for Y blocks (same as intra 16x16 but with MC prediction)
-	// For inter frames, DC values go through Y2 transform just like 16x16 intra modes
 	dequantWHT := DequantizeBlock(FromZigzag(mb.y2Coeffs), qf.Y2DC, qf.Y2AC)
 	dcValues := InverseWHT4x4(dequantWHT)
 
+	// Use shared helper for 4x4 block reconstruction
 	for by := 0; by < 4; by++ {
 		for bx := 0; bx < 4; bx++ {
-			blockIdx := by*4 + bx
-
-			zigzagCoeffs := mb.yCoeffs[blockIdx]
-			rasterCoeffs := FromZigzag(zigzagCoeffs)
-			rasterCoeffs[0] = dcValues[blockIdx]
-			dequantized := DequantizeBlock(rasterCoeffs, qf.Y1DC, qf.Y1AC)
-			dequantized[0] = dcValues[blockIdx]
-
-			invDCT := InverseDCT4x4(dequantized)
-
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*16 + by*4 + row
-					px := mbX*16 + bx*4 + col
-					if py < height && px < width {
-						predIdx := (by*4+row)*16 + bx*4 + col
-						val := int(predY[predIdx]) + int(invDCT[row*4+col])
-						recon.Y[py*width+px] = clamp8(val)
-					}
-				}
-			}
+			reconstructLuma4x4WithDC(recon, mb, predY[:], dcValues, by, bx, mbX, mbY, width, qf)
 		}
 	}
+}
 
-	// Motion-compensated prediction for chroma (MV is halved for chroma)
+// reconstructInterChroma reconstructs chroma planes using motion-compensated prediction.
+func reconstructInterChroma(recon *refFrameBuffer, mb *macroblock, refBuf *refFrameBuffer, mbX, mbY, width, height, chromaW int, qf QuantFactors) {
 	chromaH := height / 2
 	chromaMV := motionVector{
 		dx: mb.mv.dx / 2,
@@ -474,41 +458,29 @@ func reconstructInterMB(recon *refFrameBuffer, mb *macroblock, mbX, mbY, width, 
 	motionCompensate8x8(predU[:], refBuf.Cb, chromaW, chromaH, mbX*8, mbY*8, chromaMV)
 	motionCompensate8x8(predV[:], refBuf.Cr, chromaW, chromaH, mbX*8, mbY*8, chromaMV)
 
-	// Reconstruct U and V
 	for by := 0; by < 2; by++ {
 		for bx := 0; bx < 2; bx++ {
-			blockIdx := by*2 + bx
+			reconstructInterChroma4x4(recon.Cb, mb.uCoeffs, predU[:], by, bx, mbX, mbY, chromaW, chromaH, qf)
+			reconstructInterChroma4x4(recon.Cr, mb.vCoeffs, predV[:], by, bx, mbX, mbY, chromaW, chromaH, qf)
+		}
+	}
+}
 
-			// U
-			rasterU := FromZigzag(mb.uCoeffs[blockIdx])
-			dequantU := DequantizeBlock(rasterU, qf.UVDC, qf.UVAC)
-			invU := InverseDCT4x4(dequantU)
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*8 + by*4 + row
-					px := mbX*8 + bx*4 + col
-					if py < chromaH && px < chromaW {
-						predIdx := (by*4+row)*8 + bx*4 + col
-						val := int(predU[predIdx]) + int(invU[row*4+col])
-						recon.Cb[py*chromaW+px] = clamp8(val)
-					}
-				}
-			}
+// reconstructInterChroma4x4 reconstructs a single 4x4 chroma block.
+func reconstructInterChroma4x4(dst []byte, coeffs [4][16]int16, pred []byte, by, bx, mbX, mbY, chromaW, chromaH int, qf QuantFactors) {
+	blockIdx := by*2 + bx
+	raster := FromZigzag(coeffs[blockIdx])
+	dequant := DequantizeBlock(raster, qf.UVDC, qf.UVAC)
+	inv := InverseDCT4x4(dequant)
 
-			// V
-			rasterV := FromZigzag(mb.vCoeffs[blockIdx])
-			dequantV := DequantizeBlock(rasterV, qf.UVDC, qf.UVAC)
-			invV := InverseDCT4x4(dequantV)
-			for row := 0; row < 4; row++ {
-				for col := 0; col < 4; col++ {
-					py := mbY*8 + by*4 + row
-					px := mbX*8 + bx*4 + col
-					if py < chromaH && px < chromaW {
-						predIdx := (by*4+row)*8 + bx*4 + col
-						val := int(predV[predIdx]) + int(invV[row*4+col])
-						recon.Cr[py*chromaW+px] = clamp8(val)
-					}
-				}
+	for row := 0; row < 4; row++ {
+		for col := 0; col < 4; col++ {
+			py := mbY*8 + by*4 + row
+			px := mbX*8 + bx*4 + col
+			if py < chromaH && px < chromaW {
+				predIdx := (by*4+row)*8 + bx*4 + col
+				val := int(pred[predIdx]) + int(inv[row*4+col])
+				dst[py*chromaW+px] = clamp8(val)
 			}
 		}
 	}

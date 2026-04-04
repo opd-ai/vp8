@@ -80,6 +80,28 @@ func filterPlane(plane []byte, width, height, limit, step int) {
 	}
 }
 
+// computeSimpleFilter calculates the filter value for a pair of edge pixels.
+// Returns the filter value clamped to [-limit, limit], or 0 if |p0 - q0| > limit.
+// This implements the core simple filter logic per RFC 6386 §15.2.
+func computeSimpleFilter(p0, q0, limit int) (filterVal int, apply bool) {
+	diff := p0 - q0
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > limit {
+		return 0, false
+	}
+
+	// Simple filter: filter_value = (p0 - q0 + 4) >> 3, clamped to [-limit, limit]
+	filterVal = (p0 - q0 + 4) >> 3
+	if filterVal > limit {
+		filterVal = limit
+	} else if filterVal < -limit {
+		filterVal = -limit
+	}
+	return filterVal, true
+}
+
 // simpleFilterVerticalEdge applies the simple filter to a vertical edge
 // at position (x, y). The filter adjusts pixels at x-1 and x.
 // Reference: RFC 6386 §15.2
@@ -89,31 +111,13 @@ func simpleFilterVerticalEdge(plane []byte, stride, x, y, limit int) {
 	}
 
 	idx := y*stride + x
-	p0 := int(plane[idx-1]) // pixel to the left of the edge
-	q0 := int(plane[idx])   // pixel to the right of the edge
+	p0 := int(plane[idx-1])
+	q0 := int(plane[idx])
 
-	// Compute the difference
-	diff := p0 - q0
-	if diff < 0 {
-		diff = -diff
+	if filterVal, apply := computeSimpleFilter(p0, q0, limit); apply {
+		plane[idx-1] = clamp8(p0 - filterVal)
+		plane[idx] = clamp8(q0 + filterVal)
 	}
-
-	// Only filter if the difference is within the limit
-	if diff > limit {
-		return
-	}
-
-	// Simple filter: average the two boundary pixels
-	// filter_value = (p0 - q0 + 4) >> 3, clamped to [-limit, limit]
-	filterVal := (p0 - q0 + 4) >> 3
-	if filterVal > limit {
-		filterVal = limit
-	} else if filterVal < -limit {
-		filterVal = -limit
-	}
-
-	plane[idx-1] = clamp8(p0 - filterVal)
-	plane[idx] = clamp8(q0 + filterVal)
 }
 
 // simpleFilterHorizontalEdge applies the simple filter to a horizontal edge
@@ -126,26 +130,11 @@ func simpleFilterHorizontalEdge(plane []byte, stride, x, y, limit int) {
 
 	p0Idx := (y-1)*stride + x
 	q0Idx := y*stride + x
-
 	p0 := int(plane[p0Idx])
 	q0 := int(plane[q0Idx])
 
-	diff := p0 - q0
-	if diff < 0 {
-		diff = -diff
+	if filterVal, apply := computeSimpleFilter(p0, q0, limit); apply {
+		plane[p0Idx] = clamp8(p0 - filterVal)
+		plane[q0Idx] = clamp8(q0 + filterVal)
 	}
-
-	if diff > limit {
-		return
-	}
-
-	filterVal := (p0 - q0 + 4) >> 3
-	if filterVal > limit {
-		filterVal = limit
-	} else if filterVal < -limit {
-		filterVal = -limit
-	}
-
-	plane[p0Idx] = clamp8(p0 - filterVal)
-	plane[q0Idx] = clamp8(q0 + filterVal)
 }

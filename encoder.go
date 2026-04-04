@@ -68,6 +68,23 @@ type Encoder struct {
 	forceNextKeyFrame bool
 	// loopFilter controls the loop filter parameters.
 	loopFilter loopFilterParams
+
+	// Golden frame management
+	// goldenFrameInterval is the number of frames between golden frame updates.
+	// 0 means no automatic golden updates (only last frame is updated).
+	goldenFrameInterval int
+	// forceNextGolden forces the next inter frame to copy last→golden.
+	forceNextGolden bool
+	// goldenFrameCount tracks frames since last golden update.
+	goldenFrameCount int
+
+	// Coefficient probability adaptation
+	// coeffHistogram tracks token statistics for probability updates.
+	coeffHistogram *CoeffHistogram
+	// coeffProbs stores the current coefficient probabilities (may differ from defaults).
+	coeffProbs [4][8][3][11]uint8
+	// useProbUpdates enables adaptive probability updates when beneficial.
+	useProbUpdates bool
 }
 
 // NewEncoder creates a new VP8 Encoder for frames of the given dimensions
@@ -84,14 +101,17 @@ func NewEncoder(width, height, fps int) (*Encoder, error) {
 	if fps <= 0 {
 		return nil, errors.New("vp8: fps must be positive")
 	}
-	return &Encoder{
-		width:     width,
-		height:    height,
-		fps:       fps,
-		bitrate:   500_000, // default 500 kbps
-		qi:        24,      // default quantizer index
-		refFrames: newRefFrameManager(width, height),
-	}, nil
+	enc := &Encoder{
+		width:          width,
+		height:         height,
+		fps:            fps,
+		bitrate:        500_000, // default 500 kbps
+		qi:             24,      // default quantizer index
+		refFrames:      newRefFrameManager(width, height),
+		coeffHistogram: NewCoeffHistogram(),
+		coeffProbs:     DefaultCoeffProbs,
+	}
+	return enc, nil
 }
 
 // SetBitrate configures the target output bitrate in bits per second.
@@ -144,6 +164,33 @@ func (e *Encoder) SetLoopFilterLevel(level int) {
 	e.loopFilter.level = level
 }
 
+// SetGoldenFrameInterval configures the interval for golden frame updates.
+// A value of 0 (default) means no automatic golden updates — only the last
+// frame is updated after each encode. A value of N means the last frame is
+// copied to golden every N inter frames.
+//
+// Golden frames provide a longer-term reference for motion compensation,
+// improving quality after scene cuts or when the last frame has drifted.
+//
+// For example, SetGoldenFrameInterval(10) with SetKeyFrameInterval(30)
+// means: key frame, 9 inter frames, golden update, 9 inter frames,
+// golden update, 9 inter frames, key frame, etc.
+func (e *Encoder) SetGoldenFrameInterval(interval int) {
+	if interval < 0 {
+		interval = 0
+	}
+	e.goldenFrameInterval = interval
+}
+
+// ForceGoldenFrame causes the next inter frame to update the golden reference
+// frame by copying the reconstructed last frame to golden. This is useful for
+// manual scene-cut detection or periodic quality anchoring.
+//
+// For key frames, this has no effect since golden is always updated from key.
+func (e *Encoder) ForceGoldenFrame() {
+	e.forceNextGolden = true
+}
+
 // SetPartitionCount configures the number of DCT/residual partitions.
 // VP8 supports 1, 2, 4, or 8 partitions. Multiple partitions can enable
 // parallel decoding and provide error resilience.
@@ -152,6 +199,19 @@ func (e *Encoder) SetLoopFilterLevel(level int) {
 // Default is OnePartition.
 func (e *Encoder) SetPartitionCount(count PartitionCount) {
 	e.partitionCount = count
+}
+
+// SetProbabilityUpdates enables or disables adaptive coefficient probability updates.
+// When enabled, the encoder tracks token statistics and updates the probability tables
+// in frame headers when doing so improves compression efficiency.
+//
+// This can improve compression for content with consistent coefficient distributions,
+// at the cost of slightly increased header size. The encoder automatically decides
+// whether to emit updates based on estimated bit savings.
+//
+// Default is false (disabled) for backward compatibility.
+func (e *Encoder) SetProbabilityUpdates(enabled bool) {
+	e.useProbUpdates = enabled
 }
 
 // SetQuantizerDeltas configures per-plane quantizer delta values.
@@ -185,87 +245,137 @@ func (e *Encoder) SetQuantizerDeltas(y1dc, y2dc, y2ac, uvdc, uvac int) {
 //
 // The returned bytes can be passed directly to pion/rtp's VP8Payloader.Payload.
 func (e *Encoder) Encode(yuv []byte) ([]byte, error) {
-	// Validate input buffer size against configured dimensions.
 	frame, err := NewYUV420Frame(yuv, e.width, e.height)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine frame type
 	isKeyFrame := e.shouldEncodeKeyFrame()
-
-	mbW := (e.width + 15) / 16
-	mbH := (e.height + 15) / 16
-
-	// Get quantization factors for the current quantizer index with deltas
 	qf := GetQuantFactors(e.qi, e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta)
-
-	// Chroma dimensions (half of luma)
-	chromaW := e.width / 2
-	chromaH := e.height / 2
-
-	numMBs := mbW * mbH
-	mbs := make([]macroblock, numMBs)
+	mbs := e.processAllMacroblocks(frame, isKeyFrame, qf)
 
 	if isKeyFrame || !e.refFrames.hasReference(refFrameLast) {
-		// Encode as key frame (intra only)
-		for mbY := 0; mbY < mbH; mbY++ {
-			for mbX := 0; mbX < mbW; mbX++ {
-				mbIdx := mbY*mbW + mbX
-
-				srcY := extractLumaBlock(frame, mbX, mbY, e.width, e.height)
-				srcU, srcV := extractChromaBlocks(frame, mbX, mbY, chromaW, chromaH)
-				ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
-
-				mbs[mbIdx] = processMacroblock(srcY, srcU, srcV, ctx, qf)
-			}
-		}
-
-		// Build key frame bitstream
-		result, err := BuildKeyFrame(e.width, e.height, e.qi,
-			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
-			e.partitionCount, e.loopFilter, mbs)
-		if err != nil {
-			return nil, err
-		}
-
-		// Reconstruct and store as reference frame
-		e.reconstructAndStore(mbs, qf, frame)
-		e.frameCount = 1 // Start counting from 1 (next frame is frame 1 after key)
-		e.forceNextKeyFrame = false
-
-		return result, nil
+		return e.encodeKeyFrame(mbs, qf, frame)
 	}
+	return e.encodeInterFrame(mbs, qf, frame)
+}
 
-	// Encode as inter frame (with motion estimation)
-	refBuf := e.refFrames.getRef(refFrameLast)
+// processAllMacroblocks processes all macroblocks in the frame.
+func (e *Encoder) processAllMacroblocks(frame *Frame, isKeyFrame bool, qf QuantFactors) []macroblock {
+	mbW := (e.width + 15) / 16
+	mbH := (e.height + 15) / 16
+	chromaW := e.width / 2
+	chromaH := e.height / 2
+	mbs := make([]macroblock, mbW*mbH)
 
+	if isKeyFrame || !e.refFrames.hasReference(refFrameLast) {
+		e.processKeyFrameMBs(frame, mbs, mbW, mbH, chromaW, chromaH, qf)
+	} else {
+		e.processInterFrameMBs(frame, mbs, mbW, mbH, chromaW, chromaH, qf)
+	}
+	return mbs
+}
+
+// processKeyFrameMBs processes macroblocks for a key frame (intra only).
+func (e *Encoder) processKeyFrameMBs(frame *Frame, mbs []macroblock, mbW, mbH, chromaW, chromaH int, qf QuantFactors) {
 	for mbY := 0; mbY < mbH; mbY++ {
 		for mbX := 0; mbX < mbW; mbX++ {
 			mbIdx := mbY*mbW + mbX
-
 			srcY := extractLumaBlock(frame, mbX, mbY, e.width, e.height)
 			srcU, srcV := extractChromaBlocks(frame, mbX, mbY, chromaW, chromaH)
 			ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
-
-			mbs[mbIdx] = processInterMacroblock(srcY, srcU, srcV, refBuf,
-				mbX, mbY, mbW, mbs, qf, ctx)
+			mbs[mbIdx] = processMacroblock(srcY, srcU, srcV, ctx, qf)
 		}
 	}
+}
 
-	// Build inter frame bitstream
-	result, err := BuildInterFrame(e.width, e.height, e.qi,
-		e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
-		e.partitionCount, e.loopFilter, mbs)
+// processInterFrameMBs processes macroblocks for an inter frame (with motion estimation).
+func (e *Encoder) processInterFrameMBs(frame *Frame, mbs []macroblock, mbW, mbH, chromaW, chromaH int, qf QuantFactors) {
+	refBuf := e.refFrames.getRef(refFrameLast)
+	for mbY := 0; mbY < mbH; mbY++ {
+		for mbX := 0; mbX < mbW; mbX++ {
+			mbIdx := mbY*mbW + mbX
+			srcY := extractLumaBlock(frame, mbX, mbY, e.width, e.height)
+			srcU, srcV := extractChromaBlocks(frame, mbX, mbY, chromaW, chromaH)
+			ctx := e.buildMBContext(frame, mbX, mbY, mbW, mbH)
+			mbs[mbIdx] = processInterMacroblock(srcY, srcU, srcV, refBuf, mbX, mbY, mbW, mbs, qf, ctx)
+		}
+	}
+}
+
+// encodeKeyFrame builds and returns the key frame bitstream.
+func (e *Encoder) encodeKeyFrame(mbs []macroblock, qf QuantFactors, frame *Frame) ([]byte, error) {
+	result, err := e.buildKeyFrameBitstream(mbs)
 	if err != nil {
 		return nil, err
 	}
 
-	// Reconstruct and store as reference frame
-	e.reconstructAndStore(mbs, qf, frame)
+	e.reconstructAndStore(mbs, qf, frame, true, true)
+	e.frameCount = 1
+	e.forceNextKeyFrame = false
+
+	return result, nil
+}
+
+// buildKeyFrameBitstream constructs the key frame bitstream with optional probability updates.
+func (e *Encoder) buildKeyFrameBitstream(mbs []macroblock) ([]byte, error) {
+	if !e.useProbUpdates {
+		return BuildKeyFrame(e.width, e.height, e.qi,
+			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+			e.partitionCount, e.loopFilter, mbs)
+	}
+
+	probCfg := e.buildProbConfig()
+	result, err := buildKeyFrameWithProbs(e.width, e.height, e.qi,
+		e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+		e.partitionCount, e.loopFilter, mbs, probCfg)
+	e.coeffHistogram.Reset()
+	return result, err
+}
+
+// encodeInterFrame builds and returns the inter frame bitstream.
+func (e *Encoder) encodeInterFrame(mbs []macroblock, qf QuantFactors, frame *Frame) ([]byte, error) {
+	refreshGolden := e.shouldUpdateGolden()
+
+	result, err := e.buildInterFrameBitstream(mbs, refreshGolden)
+	if err != nil {
+		return nil, err
+	}
+
+	e.reconstructAndStore(mbs, qf, frame, false, refreshGolden)
 	e.frameCount++
 
 	return result, nil
+}
+
+// buildInterFrameBitstream constructs the inter frame bitstream with optional probability updates.
+func (e *Encoder) buildInterFrameBitstream(mbs []macroblock, refreshGolden bool) ([]byte, error) {
+	if !e.useProbUpdates {
+		return BuildInterFrame(e.width, e.height, e.qi,
+			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+			e.partitionCount, e.loopFilter, refreshGolden, mbs)
+	}
+
+	probCfg := e.buildProbConfig()
+	return buildInterFrameWithProbs(e.width, e.height, e.qi,
+		e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,
+		e.partitionCount, e.loopFilter, refreshGolden, mbs, probCfg)
+}
+
+// buildProbConfig creates the probability configuration for coefficient encoding.
+func (e *Encoder) buildProbConfig() *ProbConfig {
+	newProbs := e.coeffHistogram.ComputeUpdatedProbs(&e.coeffProbs)
+	if e.coeffHistogram.ShouldUpdate(&e.coeffProbs, &newProbs) {
+		return &ProbConfig{
+			CurrentProbs: &e.coeffProbs,
+			NewProbs:     &newProbs,
+			Histogram:    e.coeffHistogram,
+		}
+	}
+	return &ProbConfig{
+		CurrentProbs: &e.coeffProbs,
+		Histogram:    e.coeffHistogram,
+	}
 }
 
 // shouldEncodeKeyFrame determines whether the next frame should be a key frame.
@@ -294,7 +404,9 @@ func (e *Encoder) shouldEncodeKeyFrame() bool {
 }
 
 // reconstructAndStore reconstructs the encoded frame and stores it as a reference.
-func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *Frame) {
+// For key frames, golden is also updated. For inter frames, golden is updated
+// based on the refreshGolden parameter (which must match what was signaled in the bitstream).
+func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *Frame, isKeyFrame, refreshGolden bool) {
 	recon := e.refFrames.allocBuffer()
 	recon.valid = true
 
@@ -307,6 +419,27 @@ func (e *Encoder) reconstructAndStore(mbs []macroblock, qf QuantFactors, frame *
 
 	// Store as last reference frame
 	e.refFrames.updateLast(recon.Y, recon.Cb, recon.Cr)
+
+	// Update golden frame if needed
+	if isKeyFrame || refreshGolden {
+		// Key frames always update golden; inter frames update when signaled
+		e.refFrames.copyLastToGolden()
+		e.goldenFrameCount = 0
+		e.forceNextGolden = false
+	} else {
+		e.goldenFrameCount++
+	}
+}
+
+// shouldUpdateGolden determines whether the golden frame should be updated.
+func (e *Encoder) shouldUpdateGolden() bool {
+	if e.forceNextGolden {
+		return true
+	}
+	if e.goldenFrameInterval > 0 && e.goldenFrameCount >= e.goldenFrameInterval {
+		return true
+	}
+	return false
 }
 
 // extractLumaBlock extracts a 16x16 luma block from the frame.
@@ -352,75 +485,74 @@ func extractChromaBlocks(frame *Frame, mbX, mbY, chromaW, chromaH int) ([]byte, 
 // Uses fixed-size backing arrays in mbContext to avoid per-MB heap allocations.
 func (e *Encoder) buildMBContext(frame *Frame, mbX, mbY, mbW, mbH int) *mbContext {
 	ctx := &mbContext{}
-
 	chromaW := e.width / 2
+	chromaH := e.height / 2
 
-	// Extract luma neighbors (16 pixels above, 16 to the left)
+	buildLumaContext(ctx, frame.Y, mbX, mbY, e.width, e.height)
+	buildChromaContext(ctx, frame.Cb, frame.Cr, mbX, mbY, chromaW, chromaH)
+
+	return ctx
+}
+
+// buildLumaContext fills the luma neighbor context from the source frame.
+func buildLumaContext(ctx *mbContext, y []byte, mbX, mbY, width, height int) {
 	if mbY > 0 {
-		aboveRow := (mbY*16 - 1) * e.width
-		for i := 0; i < 16; i++ {
-			col := mbX*16 + i
-			if col < e.width {
-				ctx.lumaAboveBuf[i] = frame.Y[aboveRow+col]
-			}
-		}
+		fillAboveRow(ctx.lumaAboveBuf[:], y, mbX*16, (mbY*16-1)*width, width, 16)
 		ctx.lumaAbove = ctx.lumaAboveBuf[:]
 	}
-
 	if mbX > 0 {
-		leftCol := mbX*16 - 1
-		for i := 0; i < 16; i++ {
-			row := mbY*16 + i
-			if row < e.height {
-				ctx.lumaLeftBuf[i] = frame.Y[row*e.width+leftCol]
-			}
-		}
+		fillLeftCol(ctx.lumaLeftBuf[:], y, mbX*16-1, mbY*16, width, height, 16)
 		ctx.lumaLeft = ctx.lumaLeftBuf[:]
 	}
+	ctx.lumaTopLeft = computeTopLeft(y, mbX*16, mbY*16, width, mbX > 0 && mbY > 0)
+}
 
-	if mbX > 0 && mbY > 0 {
-		ctx.lumaTopLeft = frame.Y[(mbY*16-1)*e.width+(mbX*16-1)]
-	} else {
-		ctx.lumaTopLeft = 128
-	}
-
-	// Extract chroma neighbors (8 pixels above, 8 to the left)
+// buildChromaContext fills the chroma neighbor context from the source frame.
+func buildChromaContext(ctx *mbContext, cb, cr []byte, mbX, mbY, chromaW, chromaH int) {
 	if mbY > 0 {
 		aboveRow := (mbY*8 - 1) * chromaW
-		for i := 0; i < 8; i++ {
-			col := mbX*8 + i
-			if col < chromaW {
-				ctx.chromaAboveUBuf[i] = frame.Cb[aboveRow+col]
-				ctx.chromaAboveVBuf[i] = frame.Cr[aboveRow+col]
-			}
-		}
+		fillAboveRow(ctx.chromaAboveUBuf[:], cb, mbX*8, aboveRow, chromaW, 8)
+		fillAboveRow(ctx.chromaAboveVBuf[:], cr, mbX*8, aboveRow, chromaW, 8)
 		ctx.chromaAboveU = ctx.chromaAboveUBuf[:]
 		ctx.chromaAboveV = ctx.chromaAboveVBuf[:]
 	}
-
 	if mbX > 0 {
-		leftCol := mbX*8 - 1
-		chromaH := e.height / 2
-		for i := 0; i < 8; i++ {
-			row := mbY*8 + i
-			if row < chromaH {
-				ctx.chromaLeftUBuf[i] = frame.Cb[row*chromaW+leftCol]
-				ctx.chromaLeftVBuf[i] = frame.Cr[row*chromaW+leftCol]
-			}
-		}
+		fillLeftCol(ctx.chromaLeftUBuf[:], cb, mbX*8-1, mbY*8, chromaW, chromaH, 8)
+		fillLeftCol(ctx.chromaLeftVBuf[:], cr, mbX*8-1, mbY*8, chromaW, chromaH, 8)
 		ctx.chromaLeftU = ctx.chromaLeftUBuf[:]
 		ctx.chromaLeftV = ctx.chromaLeftVBuf[:]
 	}
+	hasCorner := mbX > 0 && mbY > 0
+	ctx.chromaTopLeftU = computeTopLeft(cb, mbX*8, mbY*8, chromaW, hasCorner)
+	ctx.chromaTopLeftV = computeTopLeft(cr, mbX*8, mbY*8, chromaW, hasCorner)
+}
 
-	if mbX > 0 && mbY > 0 {
-		ctx.chromaTopLeftU = frame.Cb[(mbY*8-1)*chromaW+(mbX*8-1)]
-		ctx.chromaTopLeftV = frame.Cr[(mbY*8-1)*chromaW+(mbX*8-1)]
-	} else {
-		ctx.chromaTopLeftU = 128
-		ctx.chromaTopLeftV = 128
+// fillAboveRow fills the above row buffer from the source plane.
+func fillAboveRow(buf, src []byte, startCol, rowOffset, planeW, count int) {
+	for i := 0; i < count; i++ {
+		col := startCol + i
+		if col < planeW {
+			buf[i] = src[rowOffset+col]
+		}
 	}
+}
 
-	return ctx
+// fillLeftCol fills the left column buffer from the source plane.
+func fillLeftCol(buf, src []byte, col, startRow, planeW, planeH, count int) {
+	for i := 0; i < count; i++ {
+		row := startRow + i
+		if row < planeH {
+			buf[i] = src[row*planeW+col]
+		}
+	}
+}
+
+// computeTopLeft returns the top-left pixel or default value.
+func computeTopLeft(src []byte, x, y, planeW int, hasCorner bool) byte {
+	if hasCorner {
+		return src[(y-1)*planeW+(x-1)]
+	}
+	return 128
 }
 
 // Width returns the configured frame width in pixels.

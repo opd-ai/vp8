@@ -254,6 +254,7 @@ var DefaultCoeffProbs = [4][8][3][11]uint8{
 type TokenEncoder struct {
 	boolEnc    *boolEncoder
 	coeffProbs *[4][8][3][11]uint8
+	histogram  *CoeffHistogram // optional: tracks token statistics for probability updates
 }
 
 // NewTokenEncoder creates a new token encoder.
@@ -262,6 +263,11 @@ func NewTokenEncoder(boolEnc *boolEncoder, probs *[4][8][3][11]uint8) *TokenEnco
 		boolEnc:    boolEnc,
 		coeffProbs: probs,
 	}
+}
+
+// SetHistogram attaches a coefficient histogram for tracking token statistics.
+func (te *TokenEncoder) SetHistogram(h *CoeffHistogram) {
+	te.histogram = h
 }
 
 // getContext returns the context (0, 1, or 2) based on the previous token.
@@ -365,42 +371,51 @@ func (te *TokenEncoder) encodeCoeffValue(probs *[11]uint8, value int16) int {
 //	        false -> p[9]: cat3 vs cat4
 //	        true -> p[10]: cat5 vs cat6
 func (te *TokenEncoder) encodeValueTree(probs *[11]uint8, token, absVal int) {
-	// p[3]: 2/3/4 vs cats
 	if token <= DCT_4 {
-		// 2, 3, or 4
-		te.boolEnc.putBit(probs[3], false) // go to node 8
-
-		// p[4]: 2 vs 3-4
-		if token == DCT_2 {
-			te.boolEnc.putBit(probs[4], false)
-		} else {
-			te.boolEnc.putBit(probs[4], true)
-			// p[5]: 3 vs 4
-			te.boolEnc.putBit(probs[5], token == DCT_4)
-		}
+		te.encodeSmallValue(probs, token)
 		return
 	}
 	te.boolEnc.putBit(probs[3], true) // go to node 12 (cats)
+	te.encodeCatValue(probs, token, absVal)
+}
 
-	// p[6]: cat1/cat2 vs cat3+
+// encodeSmallValue encodes tokens DCT_2, DCT_3, or DCT_4.
+func (te *TokenEncoder) encodeSmallValue(probs *[11]uint8, token int) {
+	te.boolEnc.putBit(probs[3], false) // go to node 8
+	if token == DCT_2 {
+		te.boolEnc.putBit(probs[4], false)
+	} else {
+		te.boolEnc.putBit(probs[4], true)
+		te.boolEnc.putBit(probs[5], token == DCT_4)
+	}
+}
+
+// encodeCatValue encodes category tokens (CAT1 through CAT6).
+func (te *TokenEncoder) encodeCatValue(probs *[11]uint8, token, absVal int) {
 	if token <= DCT_CAT2 {
-		te.boolEnc.putBit(probs[6], false) // cat1 or cat2
-		// p[7]: cat1 vs cat2
-		if token == DCT_CAT1 {
-			te.boolEnc.putBit(probs[7], false)
-			te.encodeCatExtra(0, absVal-5)
-		} else {
-			te.boolEnc.putBit(probs[7], true)
-			te.encodeCatExtra(1, absVal-7)
-		}
+		te.encodeCat1Or2(probs, token, absVal)
 		return
 	}
 	te.boolEnc.putBit(probs[6], true) // cat3+
+	te.encodeCat3Plus(probs, token, absVal)
+}
 
-	// p[8]: cat3/4 vs cat5/6
+// encodeCat1Or2 encodes CAT1 or CAT2 tokens.
+func (te *TokenEncoder) encodeCat1Or2(probs *[11]uint8, token, absVal int) {
+	te.boolEnc.putBit(probs[6], false) // cat1 or cat2
+	if token == DCT_CAT1 {
+		te.boolEnc.putBit(probs[7], false)
+		te.encodeCatExtra(0, absVal-5)
+	} else {
+		te.boolEnc.putBit(probs[7], true)
+		te.encodeCatExtra(1, absVal-7)
+	}
+}
+
+// encodeCat3Plus encodes CAT3 through CAT6 tokens.
+func (te *TokenEncoder) encodeCat3Plus(probs *[11]uint8, token, absVal int) {
 	if token <= DCT_CAT4 {
 		te.boolEnc.putBit(probs[8], false) // cat3 or cat4
-		// p[9]: cat3 vs cat4
 		if token == DCT_CAT3 {
 			te.boolEnc.putBit(probs[9], false)
 			te.encodeCatExtra(2, absVal-11)
@@ -411,8 +426,6 @@ func (te *TokenEncoder) encodeValueTree(probs *[11]uint8, token, absVal int) {
 		return
 	}
 	te.boolEnc.putBit(probs[8], true) // cat5/6
-
-	// p[10]: cat5 vs cat6
 	if token == DCT_CAT5 {
 		te.boolEnc.putBit(probs[10], false)
 		te.encodeCatExtra(4, absVal-35)
@@ -437,6 +450,11 @@ func (te *TokenEncoder) EncodeToken(blockType, coeffIdx, context int, value int1
 	}
 
 	token := tokenFromValue(int(value))
+
+	// Record token statistics for probability updates if histogram is attached
+	if te.histogram != nil {
+		te.histogram.RecordToken(blockType, band, context, token)
+	}
 
 	// Encode the token using the probability tree
 	te.encodeTokenTree(probs, token, absVal)
@@ -508,59 +526,8 @@ func (te *TokenEncoder) encodeTokenTree(probs *[11]uint8, token, absVal int) {
 	}
 	te.boolEnc.putBit(probs[2], true) // 1 = more than one
 
-	// Decision 3: 2/3/4 vs cat1+ (values 5+)
-	if token <= DCT_4 {
-		te.boolEnc.putBit(probs[3], false)
-		// p[4]: 2 vs 3/4
-		if token == DCT_2 {
-			te.boolEnc.putBit(probs[4], false)
-		} else {
-			te.boolEnc.putBit(probs[4], true)
-			// p[5]: 3 vs 4 (extra bit)
-			te.boolEnc.putBit(probs[5], token == DCT_4)
-		}
-		return
-	}
-	te.boolEnc.putBit(probs[3], true) // cat1+
-
-	// Decision 4: cat1/cat2 vs cat3+
-	if token <= DCT_CAT2 {
-		te.boolEnc.putBit(probs[6], false)
-		// p[7]: cat1 vs cat2
-		if token == DCT_CAT1 {
-			te.boolEnc.putBit(probs[7], false)
-			te.encodeCatExtra(0, absVal-5)
-		} else {
-			te.boolEnc.putBit(probs[7], true)
-			te.encodeCatExtra(1, absVal-7)
-		}
-		return
-	}
-	te.boolEnc.putBit(probs[6], true) // cat3+
-
-	// Decision 5: cat3/4 vs cat5/6
-	if token <= DCT_CAT4 {
-		te.boolEnc.putBit(probs[8], false)
-		// p[9]: cat3 vs cat4
-		if token == DCT_CAT3 {
-			te.boolEnc.putBit(probs[9], false)
-			te.encodeCatExtra(2, absVal-11)
-		} else {
-			te.boolEnc.putBit(probs[9], true)
-			te.encodeCatExtra(3, absVal-19)
-		}
-		return
-	}
-	te.boolEnc.putBit(probs[8], true)
-
-	// p[10]: cat5 vs cat6
-	if token == DCT_CAT5 {
-		te.boolEnc.putBit(probs[10], false)
-		te.encodeCatExtra(4, absVal-35)
-	} else {
-		te.boolEnc.putBit(probs[10], true)
-		te.encodeCatExtra(5, absVal-67)
-	}
+	// Delegate to shared helper for values 2+ (DCT_2 through DCT_CAT6)
+	te.encodeValueTree(probs, token, absVal)
 }
 
 // encodeCatExtra encodes the extra bits for category tokens.
@@ -597,58 +564,61 @@ func (te *TokenEncoder) EncodeBlock(coeffs [16]int16, blockType, firstCoeff int)
 // The context is derived from neighboring blocks' non-zero status (0, 1, or 2).
 // Returns true if the block had at least one non-zero coefficient.
 func (te *TokenEncoder) EncodeBlockWithContext(coeffs [16]int16, blockType, firstCoeff, initialContext int) bool {
-	// Find the last non-zero coefficient
-	lastNonZero := -1
-	for i := 15; i >= firstCoeff; i-- {
-		if coeffs[i] != 0 {
-			lastNonZero = i
-			break
-		}
-	}
+	lastNonZero := findLastNonZero(coeffs[:], firstCoeff)
 
-	// If all coefficients are zero, encode EOB at first position
 	if lastNonZero < firstCoeff {
 		te.EncodeEOB(blockType, firstCoeff, initialContext)
 		return false
 	}
 
-	// First coefficient position: write p[0]=true (has coefficients)
+	te.encodeFirstCoeff(blockType, firstCoeff, initialContext)
+	te.encodeCoefficients(coeffs, blockType, firstCoeff, lastNonZero, initialContext)
+	return true
+}
+
+// findLastNonZero finds the index of the last non-zero coefficient.
+func findLastNonZero(coeffs []int16, firstCoeff int) int {
+	for i := 15; i >= firstCoeff; i-- {
+		if coeffs[i] != 0 {
+			return i
+		}
+	}
+	return -1
+}
+
+// encodeFirstCoeff encodes the initial "has coefficients" bit.
+func (te *TokenEncoder) encodeFirstCoeff(blockType, firstCoeff, initialContext int) {
 	band := coeffBand[firstCoeff]
 	probs := &te.coeffProbs[blockType][band][initialContext]
-	te.boolEnc.putBit(probs[0], true) // not EOB, has coefficients
+	te.boolEnc.putBit(probs[0], true)
+}
 
-	// Encode all coefficients from firstCoeff to lastNonZero
-	// The decoder reads p[0] only after non-zero coefficients (not after zeros).
+// encodeCoefficients encodes all coefficients from firstCoeff to lastNonZero.
+func (te *TokenEncoder) encodeCoefficients(coeffs [16]int16, blockType, firstCoeff, lastNonZero, initialContext int) {
 	context := initialContext
 	for i := firstCoeff; i <= lastNonZero; i++ {
-		band = coeffBand[i]
-		probs = &te.coeffProbs[blockType][band][context]
-
-		// Encode the coefficient value
+		band := coeffBand[i]
+		probs := &te.coeffProbs[blockType][band][context]
 		token := te.encodeCoeffValue(probs, coeffs[i])
 		context = getContext(token)
 
-		// After a NON-ZERO coefficient, write the "continue" bit
-		// (The decoder only reads p[0] after non-zero coefficients)
 		if token != DCT_0 {
-			if i < lastNonZero {
-				// More coefficients to come: write p[0]=true
-				nextBand := coeffBand[i+1]
-				nextProbs := &te.coeffProbs[blockType][nextBand][context]
-				te.boolEnc.putBit(nextProbs[0], true) // not EOB, continue
-			} else if lastNonZero < 15 {
-				// This was the last non-zero, encode EOB
-				nextBand := coeffBand[lastNonZero+1]
-				nextProbs := &te.coeffProbs[blockType][nextBand][context]
-				te.boolEnc.putBit(nextProbs[0], false) // EOB
-			}
-			// If lastNonZero == 15, no EOB bit is needed (implicit)
+			te.encodeContinueBit(blockType, i, lastNonZero, context)
 		}
-		// After a zero coefficient, the decoder doesn't read p[0],
-		// it just continues to read p[1] for the next position.
 	}
+}
 
-	return true
+// encodeContinueBit encodes the continue/EOB bit after a non-zero coefficient.
+func (te *TokenEncoder) encodeContinueBit(blockType, pos, lastNonZero, context int) {
+	if pos < lastNonZero {
+		nextBand := coeffBand[pos+1]
+		nextProbs := &te.coeffProbs[blockType][nextBand][context]
+		te.boolEnc.putBit(nextProbs[0], true)
+	} else if lastNonZero < 15 {
+		nextBand := coeffBand[lastNonZero+1]
+		nextProbs := &te.coeffProbs[blockType][nextBand][context]
+		te.boolEnc.putBit(nextProbs[0], false)
+	}
 }
 
 // CoeffProbUpdate holds the probability table update flags.
@@ -898,4 +868,259 @@ func CopyCoeffProbs(src *[4][8][3][11]uint8) [4][8][3][11]uint8 {
 		}
 	}
 	return dst
+}
+
+// CoeffHistogram tracks token occurrence counts for probability updates.
+// Indexed as [blockType][band][context][branch] where branch maps to the 11 probability decisions.
+// The histogram tracks the number of times each branch was taken (true) vs not taken.
+type CoeffHistogram struct {
+	// counts[blockType][band][context][branch][0/1]: 0=branch false, 1=branch true
+	counts [4][8][3][11][2]uint32
+}
+
+// NewCoeffHistogram creates a zeroed coefficient histogram.
+func NewCoeffHistogram() *CoeffHistogram {
+	return &CoeffHistogram{}
+}
+
+// Reset clears all histogram counts.
+func (h *CoeffHistogram) Reset() {
+	for i := range h.counts {
+		for j := range h.counts[i] {
+			for k := range h.counts[i][j] {
+				for l := range h.counts[i][j][k] {
+					h.counts[i][j][k][l][0] = 0
+					h.counts[i][j][k][l][1] = 0
+				}
+			}
+		}
+	}
+}
+
+// RecordToken updates the histogram for a token occurrence.
+// This records all the branch decisions made while encoding the token.
+func (h *CoeffHistogram) RecordToken(blockType, band, context, token int) {
+	c := &h.counts[blockType][band][context]
+
+	// Decision 0: EOB vs not-EOB
+	if token == DCT_EOB {
+		c[0][0]++
+		return
+	}
+	c[0][1]++
+
+	// Decision 1: zero vs non-zero
+	if token == DCT_0 {
+		c[1][0]++
+		return
+	}
+	c[1][1]++
+
+	// Decision 2: one vs more-than-one
+	if token == DCT_1 {
+		c[2][0]++
+		return
+	}
+	c[2][1]++
+
+	// Delegate to helper for tokens >= DCT_2
+	h.recordLargeToken(c, token)
+}
+
+// recordLargeToken records branch decisions for tokens with values >= 2.
+func (h *CoeffHistogram) recordLargeToken(c *[11][2]uint32, token int) {
+	// Decision 3: 2/3/4 vs cat1+
+	if token <= DCT_4 {
+		c[3][0]++
+		h.recordSmallValue(c, token)
+		return
+	}
+	c[3][1]++
+	h.recordCategoryToken(c, token)
+}
+
+// recordSmallValue records decisions for tokens DCT_2, DCT_3, DCT_4.
+func (h *CoeffHistogram) recordSmallValue(c *[11][2]uint32, token int) {
+	if token == DCT_2 {
+		c[4][0]++
+		return
+	}
+	c[4][1]++
+	if token == DCT_3 {
+		c[5][0]++
+	} else {
+		c[5][1]++
+	}
+}
+
+// recordCategoryToken records decisions for category tokens (CAT1-CAT6).
+func (h *CoeffHistogram) recordCategoryToken(c *[11][2]uint32, token int) {
+	// Decision 6: cat1/cat2 vs cat3+
+	if token <= DCT_CAT2 {
+		c[6][0]++
+		if token == DCT_CAT1 {
+			c[7][0]++
+		} else {
+			c[7][1]++
+		}
+		return
+	}
+	c[6][1]++
+
+	// Decision 8: cat3/4 vs cat5/6
+	if token <= DCT_CAT4 {
+		c[8][0]++
+		if token == DCT_CAT3 {
+			c[9][0]++
+		} else {
+			c[9][1]++
+		}
+		return
+	}
+	c[8][1]++
+
+	// Decision 10: cat5 vs cat6
+	if token == DCT_CAT5 {
+		c[10][0]++
+	} else {
+		c[10][1]++
+	}
+}
+
+// ComputeUpdatedProbs computes updated probabilities based on the histogram.
+// Returns updated probability tables that can be encoded with EncodeCoeffProbUpdates.
+func (h *CoeffHistogram) ComputeUpdatedProbs(baseProbs *[4][8][3][11]uint8) [4][8][3][11]uint8 {
+	var updated [4][8][3][11]uint8
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 8; j++ {
+			for k := 0; k < 3; k++ {
+				h.computeProbsForBand(baseProbs, &updated, i, j, k)
+			}
+		}
+	}
+	return updated
+}
+
+// computeProbsForBand computes updated probabilities for a single coefficient band.
+func (h *CoeffHistogram) computeProbsForBand(baseProbs, updated *[4][8][3][11]uint8, i, j, k int) {
+	for l := 0; l < 11; l++ {
+		updated[i][j][k][l] = h.computeSingleProb(baseProbs[i][j][k][l], i, j, k, l)
+	}
+}
+
+// computeSingleProb computes a single updated probability from histogram counts.
+func (h *CoeffHistogram) computeSingleProb(baseProb uint8, i, j, k, l int) uint8 {
+	falseCount := h.counts[i][j][k][l][0]
+	trueCount := h.counts[i][j][k][l][1]
+	total := falseCount + trueCount
+
+	if total < 16 {
+		return baseProb
+	}
+	return clampProb((falseCount * 256) / total)
+}
+
+// clampProb clamps a probability value to the valid range [1, 255].
+func clampProb(prob uint32) uint8 {
+	if prob < 1 {
+		return 1
+	}
+	if prob > 255 {
+		return 255
+	}
+	return uint8(prob)
+}
+
+// EstimateUpdateCost estimates the bit cost of encoding probability updates.
+// Returns the approximate number of bits needed to encode the differences.
+func (h *CoeffHistogram) EstimateUpdateCost(baseProbs, newProbs *[4][8][3][11]uint8) int {
+	cost := 0
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 8; j++ {
+			for k := 0; k < 3; k++ {
+				cost += estimateBandUpdateCost(baseProbs[i][j][k], newProbs[i][j][k])
+			}
+		}
+	}
+	return cost
+}
+
+// estimateBandUpdateCost estimates the cost for a single coefficient band.
+func estimateBandUpdateCost(baseRow, newRow [11]uint8) int {
+	cost := 0
+	for l := 0; l < 11; l++ {
+		if newRow[l] != baseRow[l] {
+			cost += 9 // 1 bit flag + 8 bit value
+		} else {
+			cost += 1 // 1 bit flag only
+		}
+	}
+	return cost
+}
+
+// EstimateSavings estimates bit savings from using updated probabilities.
+// This is a rough estimate based on the histogram data.
+func (h *CoeffHistogram) EstimateSavings(baseProbs, newProbs *[4][8][3][11]uint8) int {
+	var baseCost, newCost int
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 8; j++ {
+			for k := 0; k < 3; k++ {
+				bc, nc := h.estimateBandSavings(baseProbs[i][j][k], newProbs[i][j][k], i, j, k)
+				baseCost += bc
+				newCost += nc
+			}
+		}
+	}
+	return baseCost - newCost
+}
+
+// estimateBandSavings estimates savings for a single coefficient band.
+func (h *CoeffHistogram) estimateBandSavings(baseRow, newRow [11]uint8, i, j, k int) (baseCost, newCost int) {
+	for l := 0; l < 11; l++ {
+		falseCount := int(h.counts[i][j][k][l][0])
+		trueCount := int(h.counts[i][j][k][l][1])
+		if falseCount+trueCount == 0 {
+			continue
+		}
+		baseCost += estimateBitCost(baseRow[l], falseCount, trueCount)
+		newCost += estimateBitCost(newRow[l], falseCount, trueCount)
+	}
+	return baseCost, newCost
+}
+
+// estimateBitCost estimates the bit cost for encoding decisions with a given probability.
+func estimateBitCost(prob uint8, falseCount, trueCount int) int {
+	// Convert probability to bits (rough approximation)
+	// For a branch with probability p of being false:
+	// Cost = -falseCount * log2(p/256) - trueCount * log2(1 - p/256)
+	// Approximation using fixed-point arithmetic
+	p := int(prob)
+	if p == 0 {
+		p = 1
+	}
+	if p == 256 {
+		p = 255
+	}
+
+	// Use approximation: cost ≈ count * (256 / prob) for false branch
+	// and count * (256 / (256-prob)) for true branch
+	falseCost := 0
+	if falseCount > 0 && p > 0 {
+		falseCost = (falseCount * 256) / p
+	}
+	trueCost := 0
+	if trueCount > 0 && p < 256 {
+		trueCost = (trueCount * 256) / (256 - p)
+	}
+
+	return falseCost + trueCost
+}
+
+// ShouldUpdate determines if using updated probabilities is beneficial.
+// Returns true if estimated savings exceed the cost of encoding updates.
+func (h *CoeffHistogram) ShouldUpdate(baseProbs, newProbs *[4][8][3][11]uint8) bool {
+	savings := h.EstimateSavings(baseProbs, newProbs)
+	cost := h.EstimateUpdateCost(baseProbs, newProbs)
+	// Require at least 10% net savings to justify the update overhead
+	return savings > cost+(cost/10)
 }
