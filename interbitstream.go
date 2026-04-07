@@ -415,5 +415,5 @@ func buildInterFrameWithProbs(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta
 	residualParts := encodeResidualPartitionsWithProbs(partCount, mbs, mbW, mbH, probCfg)
 
 	// Build inter frame using shared assembler
-	return assembleInterFrameBitstream(firstPart, residualParts), nil
+	return assembleInterFrameBitstream(firstPart, residualParts)
 }

@@ -715,7 +715,7 @@ func buildKeyFrameWithProbs(width, height, qi, y1DCDelta, y2DCDelta, y2ACDelta, 
 	residualParts := encodeResidualPartitionsWithProbs(partCount, mbs, mbW, mbH, probCfg)
 
 	// Build key frame: frame_type=0 with start code and dimensions
-	return assembleKeyFrameBitstream(firstPart, residualParts, width, height), nil
+	return assembleKeyFrameBitstream(firstPart, residualParts, width, height)
 }
 
 // encodeResidualPartitions encodes DCT residual coefficients into partitions.
@@ -771,9 +771,12 @@ func buildFrameTag(frameType, firstPartSize int) ([3]byte, error) {
 }
 
 // assembleKeyFrameBitstream builds the complete key frame bitstream.
-func assembleKeyFrameBitstream(firstPart []byte, residualParts [][]byte, width, height int) []byte {
+func assembleKeyFrameBitstream(firstPart []byte, residualParts [][]byte, width, height int) ([]byte, error) {
 	firstPartSize := len(firstPart)
-	tag := buildFrameTag(0, firstPartSize)
+	tag, err := buildFrameTag(0, firstPartSize)
+	if err != nil {
+		return nil, err
+	}
 
 	partSizes := BuildPartitionSizes(residualParts)
 	residualData := ConcatPartitions(residualParts)
@@ -792,13 +795,16 @@ func assembleKeyFrameBitstream(firstPart []byte, residualParts [][]byte, width, 
 	out = append(out, partSizes...)
 	out = append(out, residualData...)
 
-	return out
+	return out, nil
 }
 
 // assembleInterFrameBitstream builds the complete inter frame bitstream.
-func assembleInterFrameBitstream(firstPart []byte, residualParts [][]byte) []byte {
+func assembleInterFrameBitstream(firstPart []byte, residualParts [][]byte) ([]byte, error) {
 	firstPartSize := len(firstPart)
-	tag := buildFrameTag(1, firstPartSize)
+	tag, err := buildFrameTag(1, firstPartSize)
+	if err != nil {
+		return nil, err
+	}
 
 	partSizes := BuildPartitionSizes(residualParts)
 	residualData := ConcatPartitions(residualParts)
@@ -810,7 +816,7 @@ func assembleInterFrameBitstream(firstPart []byte, residualParts [][]byte) []byt
 	out = append(out, partSizes...)
 	out = append(out, residualData...)
 
-	return out
+	return out, nil
 }
 
 // tokenEncoderProvider abstracts how a TokenEncoder is obtained for each row.
