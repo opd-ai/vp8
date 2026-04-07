@@ -37,54 +37,110 @@ var interMVProbs = [2][19]uint8{
 }
 
 // encodeMVComponent encodes a single motion vector component (dx or dy)
-// using the VP8 motion vector coding scheme.
+// using the VP8 motion vector coding scheme per RFC 6386 §17.1.
 // The component is a signed value in quarter-pixel units.
-// Reference: RFC 6386 §17
+//
+// Probability table offsets:
+//   - probs[0]: mvpis_short (short vs long)
+//   - probs[1]: sign
+//   - probs[2..8]: short tree (7 probabilities for 8 values)
+//   - probs[9..18]: long bits (10 probabilities for bits 0-9)
 func encodeMVComponent(enc *boolEncoder, val int16, probs [19]uint8) {
-	// Sign
 	sign := val < 0
 	absVal := int(val)
 	if sign {
 		absVal = -absVal
 	}
 
-	// VP8 MVs are encoded as (magnitude - 1) since 0 means "zero MV" which
-	// is handled at the mode level. For NEWMV, the delta from predicted MV
-	// is encoded. The magnitude is the absolute value of this delta.
-
 	if absVal < 8 {
-		// Short encoding (magnitude 0..7)
+		// Short encoding (magnitude 0..7): use 7-node tree at probs[2..8]
 		enc.putBit(probs[0], false) // is_short = false (short)
-
-		// Encode 3-bit value using the short tree
-		// Tree: bit[0] splits {0,1,2,3} vs {4,5,6,7}
-		v := absVal
-		enc.putBit(probs[2], v >= 4)
-		if v >= 4 {
-			v -= 4
-		}
-		enc.putBit(probs[3], v >= 2)
-		if v >= 2 {
-			v -= 2
-		}
-		enc.putBit(probs[4], v >= 1)
+		encodeSmallMV(enc, absVal, probs)
 	} else {
 		// Long encoding (magnitude >= 8)
 		enc.putBit(probs[0], true) // is_short = true (long)
-
-		// Encode using bit-by-bit scheme for magnitudes >= 8
-		// Bits are encoded from MSB to LSB
-		v := absVal
-		for i := 0; i < 10; i++ {
-			bit := (v >> uint(9-i)) & 1
-			enc.putBit(probs[9+i], bit == 1)
-		}
+		encodeLargeMV(enc, absVal, probs)
 	}
 
 	// Encode sign if value is non-zero
 	if absVal > 0 {
 		enc.putBit(probs[1], sign)
 	}
+}
+
+// encodeSmallMV encodes MV magnitude 0-7 using the RFC 6386 §17.1 small_mvtree.
+// Tree structure (probs[2..8]):
+//
+//	       [0]
+//	      /   \
+//	    [1]   [4]
+//	   /   \  /   \
+//	 [2]  [3][5]  [6]
+//	 /\   /\  /\   /\
+//	0  1 2  3 4  5 6  7
+//
+// Node indices: 0->probs[2], 1->probs[3], 2->probs[4], 3->probs[5],
+//
+//	4->probs[6], 5->probs[7], 6->probs[8]
+func encodeSmallMV(enc *boolEncoder, v int, probs [19]uint8) {
+	// First split: {0,1,2,3} vs {4,5,6,7}
+	enc.putBit(probs[2], v >= 4)
+	if v >= 4 {
+		// Right subtree {4,5,6,7}
+		v -= 4
+		// Split: {4,5} vs {6,7}
+		enc.putBit(probs[6], v >= 2)
+		if v >= 2 {
+			// {6,7}
+			enc.putBit(probs[8], v == 3) // 6 or 7
+		} else {
+			// {4,5}
+			enc.putBit(probs[7], v == 1) // 4 or 5
+		}
+	} else {
+		// Left subtree {0,1,2,3}
+		// Split: {0,1} vs {2,3}
+		enc.putBit(probs[3], v >= 2)
+		if v >= 2 {
+			// {2,3}
+			enc.putBit(probs[5], v == 3) // 2 or 3
+		} else {
+			// {0,1}
+			enc.putBit(probs[4], v == 1) // 0 or 1
+		}
+	}
+}
+
+// encodeLargeMV encodes MV magnitude >= 8 per RFC 6386 §17.1.
+// For long values, bits are encoded in a specific order:
+//   - Bits 0, 1, 2 (using probs[9], probs[10], probs[11])
+//   - Bits 9, 8, 7, 6, 5, 4 (using probs[18], probs[17], probs[16], probs[15], probs[14], probs[13])
+//   - Bit 3 is conditionally encoded (using probs[12]) only if needed
+//
+// Since the value is >= 8, if the high bits (bits 4-9) are all zero, bit 3 must
+// be 1 and is not explicitly coded.
+func encodeLargeMV(enc *boolEncoder, v int, probs [19]uint8) {
+	// Encode bits 0, 1, 2 (LSBs)
+	for i := 0; i < 3; i++ {
+		bit := (v >> i) & 1
+		enc.putBit(probs[9+i], bit == 1)
+	}
+
+	// Encode bits 9, 8, 7, 6, 5, 4 (high bits, descending order)
+	for i := 9; i >= 4; i-- {
+		bit := (v >> i) & 1
+		enc.putBit(probs[9+i], bit == 1)
+	}
+
+	// Bit 3: only encode if high bits (4-9) are non-zero
+	// If v <= 15 (only bits 0-3 set) and v >= 8, then bit 3 must be 1
+	// and is implicitly known to the decoder
+	if v&0xFFF0 != 0 {
+		// High bits are non-zero, so bit 3 must be explicitly coded
+		bit := (v >> 3) & 1
+		enc.putBit(probs[12], bit == 1)
+	}
+	// If high bits are zero, bit 3 is implicitly 1 (since v >= 8)
 }
 
 // encodeMV encodes a full motion vector (dx, dy) as the difference from

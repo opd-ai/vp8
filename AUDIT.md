@@ -207,8 +207,8 @@ This audit covers the pure-Go VP8 encoder implementation against RFC 6386. The e
 
 ## Resolution Checklist
 
-- [ ] **Critical**: Rewrite short MV encoding to use RFC 6386 §17.1 tree structure — `interbitstream.go:55-70`
-- [ ] **Critical**: Rewrite long MV encoding to match RFC 6386 §17.1 (high bits + short tree for low 3 bits) — `interbitstream.go:71-82`
+- [x] **Critical**: Rewrite short MV encoding to use RFC 6386 §17.1 tree structure — `interbitstream.go:55-70`
+- [x] **Critical**: Rewrite long MV encoding to match RFC 6386 §17.1 (high bits + short tree for low 3 bits) — `interbitstream.go:71-82`
 - [ ] **High**: Implement correct simple loop filter formula per RFC 6386 §15.2 — `loopfilter.go:86-103`
 - [ ] **High**: Implement per-quadrant chroma DC prediction per RFC 6386 §12.2 — `prediction.go:217-239`
 - [ ] **High**: Differentiate macroblock vs sub-block edge filter strength — `loopfilter.go:67-81`
