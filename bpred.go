@@ -73,7 +73,7 @@ func Predict4x4(dst, above, left []byte, mode intraBMode) {
 	case B_VE_PRED:
 		predict4x4VE(dst, above)
 	case B_HE_PRED:
-		predict4x4HE(dst, left)
+		predict4x4HE(dst, above, left)
 	case B_LD_PRED:
 		predict4x4LD(dst, above)
 	case B_RD_PRED:
@@ -281,9 +281,15 @@ func fill4x4Rows(dst []byte, row [4]byte) {
 }
 
 // predict4x4HE fills a 4x4 block using horizontal prediction with smoothing.
-func predict4x4HE(dst, left []byte) {
+// Per RFC 6386 §12.3, row 0 uses avg3(P, L[0], L[1]) where P is the top-left pixel.
+func predict4x4HE(dst, above, left []byte) {
 	var L [4]byte
 	var P byte = 129
+
+	// Extract top-left pixel P from above array (above[0] contains P)
+	if len(above) >= 1 {
+		P = above[0]
+	}
 
 	if len(left) >= 4 {
 		copy(L[:], left[:4])
@@ -292,9 +298,6 @@ func predict4x4HE(dst, left []byte) {
 			L[i] = 129
 		}
 	}
-
-	// P is at left[-1], which would be above[0] in the full context
-	// Since we don't have it directly, use L[0] - 1 or default
 
 	// Row 0: avg3(P, L[0], L[1])
 	// Row 1: avg3(L[0], L[1], L[2])
