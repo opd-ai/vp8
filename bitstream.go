@@ -3,6 +3,7 @@ package vp8
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 var (
