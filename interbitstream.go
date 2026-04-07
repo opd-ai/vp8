@@ -296,7 +296,7 @@ func encodeInterMBModes(enc *boolEncoder, width int, mbs []macroblock) {
 
 		enc.putBit(255, mb.skip)
 		encodeInterMBModeWithContext(enc, &mb, aboveBModes[mbX], leftBModes)
-		updateBPredContext(&mb, aboveBModes, leftBModes, mbX)
+		updateBPredContext(&mb, aboveBModes, &leftBModes, mbX)
 
 		if !mb.isInter {
 			encodeUVMode(enc, mb.chromaMode)
@@ -305,7 +305,8 @@ func encodeInterMBModes(enc *boolEncoder, width int, mbs []macroblock) {
 }
 
 // updateBPredContext updates B_PRED context for the next macroblock.
-func updateBPredContext(mb *macroblock, aboveBModes [][4]intraBMode, leftBModes [4]intraBMode, mbX int) {
+// Note: leftBModes is passed by pointer to allow updates to propagate to the caller.
+func updateBPredContext(mb *macroblock, aboveBModes [][4]intraBMode, leftBModes *[4]intraBMode, mbX int) {
 	if !mb.isInter && mb.lumaMode == B_PRED {
 		for i := 0; i < 4; i++ {
 			aboveBModes[mbX][i] = mb.bModes[12+i]

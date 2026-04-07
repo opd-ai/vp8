@@ -319,6 +319,10 @@ func (e *Encoder) encodeKeyFrame(mbs []macroblock, qf QuantFactors, frame *Frame
 
 // buildKeyFrameBitstream constructs the key frame bitstream with optional probability updates.
 func (e *Encoder) buildKeyFrameBitstream(mbs []macroblock) ([]byte, error) {
+	// Per VP8 spec, all probabilities reset to defaults on key frames.
+	// Reset coeffProbs to defaults before encoding the key frame.
+	e.coeffProbs = DefaultCoeffProbs
+
 	if !e.useProbUpdates {
 		return BuildKeyFrame(e.width, e.height, e.qi,
 			e.y1DCDelta, e.y2DCDelta, e.y2ACDelta, e.uvDCDelta, e.uvACDelta,

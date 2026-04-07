@@ -749,14 +749,25 @@ func encodeResidualPartitionsWithProbs(partCount PartitionCount, mbs []macrobloc
 	return pw.Finalize()
 }
 
+// maxFirstPartSize is the maximum size of the first partition in bytes.
+// The first partition size is stored in 19 bits of the frame tag.
+const maxFirstPartSize = (1 << 19) - 1 // 524,287 bytes
+
+// errFirstPartitionTooLarge is returned when the first partition exceeds the 19-bit limit.
+var errFirstPartitionTooLarge = fmt.Errorf("first partition size exceeds 19-bit limit (%d bytes)", maxFirstPartSize)
+
 // buildFrameTag constructs the 3-byte VP8 frame tag.
 // frameType: 0=key frame, 1=inter frame
-func buildFrameTag(frameType, firstPartSize int) [3]byte {
+// Returns an error if firstPartSize exceeds the 19-bit limit (524,287 bytes).
+func buildFrameTag(frameType, firstPartSize int) ([3]byte, error) {
+	if firstPartSize > maxFirstPartSize {
+		return [3]byte{}, errFirstPartitionTooLarge
+	}
 	tag := uint32(frameType)
 	tag |= 0 << 1                     // version = 0
 	tag |= 1 << 4                     // show_frame = 1
 	tag |= uint32(firstPartSize) << 5 // first_part_size
-	return [3]byte{byte(tag), byte(tag >> 8), byte(tag >> 16)}
+	return [3]byte{byte(tag), byte(tag >> 8), byte(tag >> 16)}, nil
 }
 
 // assembleKeyFrameBitstream builds the complete key frame bitstream.
