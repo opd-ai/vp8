@@ -3,7 +3,7 @@
 ## Executive Summary
 
 **Lines of code analyzed:** 6,326 (16 non-test source files)
-**Total files audited:** 16 source files + 1 backup file
+**Total files audited:** 16 source files (plus 1 stale backup file)
 **Major findings:** 23 issues identified
 **Severity breakdown:** 3 Critical, 6 High, 9 Medium, 5 Low
 
@@ -94,7 +94,7 @@ This audit covers the pure-Go VP8 encoder implementation against RFC 6386. The e
 - **Resolution**: [ ] Consider adding a decoder or documenting the dependency on external decoders.
 
 ### No Sub-Pixel Motion Estimation
-- **Description**: Motion estimation is integer-pixel only (all MVs are multiples of 4 quarter-pixels, snapped to 2-pixel grid). VP8 supports quarter-pixel precision with 6-tap filtering.
+- **Description**: Motion estimation operates at 2-full-pixel granularity only (MVs are snapped to multiples of 8 quarter-pixels, i.e., a 2-pixel grid). VP8 supports quarter-pixel precision with 6-tap filtering for much finer motion accuracy.
 - **VP8 Spec Reference**: RFC 6386 §18.4 (sub-pixel interpolation)
 - **Impact**: Significantly reduced compression efficiency for sequences with sub-pixel motion. This is explicitly documented as a limitation.
 - **Resolution**: [ ] Implement sub-pixel motion estimation with 6-tap interpolation filters per RFC 6386 §18.4.
@@ -139,11 +139,11 @@ This audit covers the pure-Go VP8 encoder implementation against RFC 6386. The e
 - **Reproduction**: Encode an inter frame with B_PRED intra macroblocks side-by-side. The second macroblock's B_PRED context will use stale `leftBModes` values instead of the first macroblock's right column.
 - **Resolution**: [ ] Change `leftBModes` parameter to a pointer (`*[4]intraBMode`) or return the updated value.
 
-### Potential Panic on Non-16-Aligned Dimensions
-- **Issue**: The encoder requires even dimensions (validated in `NewEncoder`) but does not require 16-pixel alignment. When dimensions are not multiples of 16, macroblock processing correctly handles edge pixels via clamping in `extractLumaBlock`/`extractChromaBlocks`. However, `refFrameManager.allocBuffer()` allocates `(width/2) * (height/2)` bytes for chroma, which is correct for even dimensions but could lead to off-by-one if the width or height is not even (already validated, so this is safe).
+### Internal Functions Lack Dimension Validation Guards
+- **Issue**: Internal functions like `refFrameManager.allocBuffer()`, `reconstructFrame`, and `extractLumaBlock` assume dimensions are positive and even, but do not validate this themselves. While `NewEncoder` validates dimensions at the public API boundary, internal callers (e.g., from tests or future refactoring) could pass invalid values and trigger index-out-of-range panics. This is a code hardening concern, not a current bug.
 - **Location**: `refframe.go:60-71`
-- **Reproduction**: Not reproducible due to validation in `NewEncoder`, but a caller of internal functions could trigger this.
-- **Resolution**: [ ] Add internal assertions or document that allocBuffer assumes validated dimensions.
+- **Reproduction**: Only possible if internal functions are called directly with invalid dimensions (bypassing `NewEncoder`).
+- **Resolution**: [ ] Add defensive validation or document that internal functions assume pre-validated dimensions.
 
 ### Stale Coefficient Probabilities After Key Frame Reset
 - **Issue**: When `useProbUpdates` is enabled, the encoder resets `coeffHistogram` after building the key frame bitstream (`e.coeffHistogram.Reset()` at line 332), but `e.coeffProbs` (the current probability state) is never reset to `DefaultCoeffProbs` on key frames. Per VP8 spec, all probabilities reset to defaults on key frames. If probabilities were previously updated for inter frames, they carry over incorrectly to the next GOP.
@@ -215,7 +215,7 @@ This audit covers the pure-Go VP8 encoder implementation against RFC 6386. The e
 
 ## Summary Statistics
 
-- **Total files audited:** 16
+- **Total source files audited:** 16 (plus 1 stale backup file: `macroblock.go.bak`)
 - **Total lines of source code:** 6,326
 - **Critical issues:** 3
 - **High priority:** 6
