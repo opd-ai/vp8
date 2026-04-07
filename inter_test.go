@@ -338,8 +338,12 @@ func TestLoopFilterBasic(t *testing.T) {
 	origQ0 := int(recon.Y[0*16+8])
 	origDiff := origQ0 - origP0
 
+	// Per RFC 6386 §15.2, the filtering condition is:
+	// (abs(P0 - Q0) * 2 + abs(P1 - Q1) / 2) <= edge_limit
+	// With P0=120, Q0=130, P1=120, Q1=130: (10*2 + 10/2) = 25
+	// So we need level >= 25 for filtering to occur
 	params := loopFilterParams{
-		level:     20,
+		level:     30,
 		sharpness: 0,
 	}
 

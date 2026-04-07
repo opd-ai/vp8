@@ -22,6 +22,12 @@ type loopFilterParams struct {
 // The filter smooths block boundary pixels to reduce visual blocking artifacts.
 // It operates on 4x4 block edges (both macroblock and sub-block boundaries).
 //
+// Per RFC 6386 §15.2, the simple filter only applies to luma edges.
+// Chroma edges are left unfiltered.
+//
+// Per RFC 6386 §15.4, macroblock edges (every 16 pixels for luma) use a
+// stronger filter threshold than sub-block edges (every 4 pixels).
+//
 // The filter strength is determined by the level parameter (0–63).
 // Level 0 means no filtering (pass-through).
 func applyLoopFilter(recon *refFrameBuffer, params loopFilterParams) {
@@ -31,39 +37,93 @@ func applyLoopFilter(recon *refFrameBuffer, params loopFilterParams) {
 
 	width := recon.Width
 	height := recon.Height
-	chromaW := width / 2
-	chromaH := height / 2
 
-	// Compute filter limit thresholds from level and sharpness
-	limit := computeFilterLimit(params.level, params.sharpness)
+	// Compute interior limit from level and sharpness per RFC 6386 §15.4
+	interiorLimit := computeInteriorLimit(params.level, params.sharpness)
 
-	// Filter luma (Y) plane
-	filterPlane(recon.Y, width, height, limit, 4)
+	// Compute edge limits per RFC 6386 §15.4
+	// Macroblock edge limit is stronger (higher threshold)
+	mbEdgeLimit := ((params.level + 2) * 2) + interiorLimit
+	// Sub-block edge limit is weaker
+	subEdgeLimit := (params.level * 2) + interiorLimit
 
-	// Filter chroma (Cb, Cr) planes
-	filterPlane(recon.Cb, chromaW, chromaH, limit, 4)
-	filterPlane(recon.Cr, chromaW, chromaH, limit, 4)
+	// Clamp limits to valid range
+	if mbEdgeLimit > 255 {
+		mbEdgeLimit = 255
+	}
+	if subEdgeLimit > 255 {
+		subEdgeLimit = 255
+	}
+
+	// Filter luma (Y) plane only - per RFC 6386 §15.2, simple filter
+	// does not filter chroma edges
+	filterPlaneLuma(recon.Y, width, height, mbEdgeLimit, subEdgeLimit)
 }
 
-// computeFilterLimit computes the interior and edge limit values from the
+// computeInteriorLimit computes the interior limit value from the
 // loop filter level and sharpness parameters.
 // Reference: RFC 6386 §15.4
-func computeFilterLimit(level, sharpness int) int {
-	limit := level
+func computeInteriorLimit(level, sharpness int) int {
+	interiorLimit := level
 	if sharpness > 0 {
-		limit >>= (sharpness + 3) >> 2
-		if limit < 1 {
-			limit = 1
+		if sharpness > 4 {
+			interiorLimit >>= 2
+		} else {
+			interiorLimit >>= 1
+		}
+		maxLimit := 9 - sharpness
+		if interiorLimit > maxLimit {
+			interiorLimit = maxLimit
 		}
 	}
-	if limit > 63 {
-		limit = 63
+	if interiorLimit < 1 {
+		interiorLimit = 1
 	}
-	return limit
+	return interiorLimit
+}
+
+// computeFilterLimit computes the filter limit value from level and sharpness.
+// This is a simplified version that returns the sub-block edge limit.
+// Reference: RFC 6386 §15.4
+func computeFilterLimit(level, sharpness int) int {
+	interiorLimit := computeInteriorLimit(level, sharpness)
+	return (level * 2) + interiorLimit
+}
+
+// filterPlaneLuma applies the simple loop filter to the luma plane,
+// differentiating between macroblock edges (every 16 pixels) and
+// sub-block edges (every 4 pixels).
+// Reference: RFC 6386 §15.4
+func filterPlaneLuma(plane []byte, width, height, mbEdgeLimit, subEdgeLimit int) {
+	// Filter vertical edges (between columns)
+	for y := 0; y < height; y++ {
+		for x := 4; x < width; x += 4 {
+			// Use stronger limit at macroblock boundaries (every 16 pixels)
+			limit := subEdgeLimit
+			if x%16 == 0 {
+				limit = mbEdgeLimit
+			}
+			simpleFilterVerticalEdge(plane, width, x, y, limit)
+		}
+	}
+
+	// Filter horizontal edges (between rows)
+	for y := 4; y < height; y += 4 {
+		// Use stronger limit at macroblock boundaries (every 16 pixels)
+		limit := subEdgeLimit
+		if y%16 == 0 {
+			limit = mbEdgeLimit
+		}
+		for x := 0; x < width; x++ {
+			simpleFilterHorizontalEdge(plane, width, x, y, limit)
+		}
+	}
 }
 
 // filterPlane applies the simple loop filter to a single plane.
 // It filters vertical and horizontal edges at the specified step interval.
+// This is kept for backward compatibility but filterPlaneLuma should be
+// used for luma filtering with proper MB/sub-block edge differentiation.
 func filterPlane(plane []byte, width, height, limit, step int) {
 	// Filter vertical edges (between columns)
 	for y := 0; y < height; y++ {
@@ -98,15 +158,20 @@ func clampS8(v int) int {
 //   - apply indicates whether filtering should be applied
 //
 // The simple filter uses 4 pixels: p1, p0, q0, q1
-// a = clamp(p1 - q1 + 3*(q0 - p0))
-// The final adjustments are a/8 with different rounding for p0 and q0.
+// Per RFC 6386 §15.2: a = clamp(p1 - q1 + 3*(q0 - p0))
+// The filtering condition is: (|p0 - q0| * 2 + |p1 - q1| / 2) <= edge_limit
 func computeSimpleFilterFull(p1, p0, q0, q1, limit int) (a, b int, apply bool) {
-	// Check edge limit: |p0 - q0| must be <= limit
-	diff := p0 - q0
-	if diff < 0 {
-		diff = -diff
+	// Per RFC 6386 §15.2: Check edge limit using the formula
+	// (abs(P0 - Q0) * 2 + abs(P1 - Q1) / 2) <= edge_limit
+	diffP0Q0 := p0 - q0
+	if diffP0Q0 < 0 {
+		diffP0Q0 = -diffP0Q0
 	}
-	if diff > limit {
+	diffP1Q1 := p1 - q1
+	if diffP1Q1 < 0 {
+		diffP1Q1 = -diffP1Q1
+	}
+	if diffP0Q0*2+diffP1Q1/2 > limit {
 		return 0, 0, false
 	}
 

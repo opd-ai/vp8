@@ -209,9 +209,9 @@ This audit covers the pure-Go VP8 encoder implementation against RFC 6386. The e
 
 - [x] **Critical**: Rewrite short MV encoding to use RFC 6386 §17.1 tree structure — `interbitstream.go:55-70`
 - [x] **Critical**: Rewrite long MV encoding to match RFC 6386 §17.1 (high bits + short tree for low 3 bits) — `interbitstream.go:71-82`
-- [ ] **High**: Implement correct simple loop filter formula per RFC 6386 §15.2 — `loopfilter.go:86-103`
-- [ ] **High**: Implement per-quadrant chroma DC prediction per RFC 6386 §12.2 — `prediction.go:217-239`
-- [ ] **High**: Differentiate macroblock vs sub-block edge filter strength — `loopfilter.go:67-81`
+- [x] **High**: Implement correct simple loop filter formula per RFC 6386 §15.2 — `loopfilter.go:86-103`
+- [x] **High**: Implement per-quadrant chroma DC prediction per RFC 6386 §12.2 — `prediction.go:217-239` (verified correct: RFC 6386 §12.2 specifies single DC value for entire 8x8 block, not per-quadrant)
+- [x] **High**: Differentiate macroblock vs sub-block edge filter strength — `loopfilter.go:67-81`
 - [ ] **High**: Fix pass-by-value bug in `updateBPredContext` for leftBModes — `interbitstream.go:252`
 - [ ] **High**: Reset `coeffProbs` to defaults on key frame when using prob updates — `encoder.go:328-333`
 - [ ] **High**: Add first partition size overflow check in `buildFrameTag` — `bitstream.go:754-760`
