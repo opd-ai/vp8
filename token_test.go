@@ -424,4 +424,13 @@ func TestCoeffHistogramOverflow(t *testing.T) {
 	if prob < 64 || prob > 192 {
 		t.Errorf("computeSingleProb with equal large counts = %d, want near 128", prob)
 	}
+
+	// Ensure total is widened too: this sum overflows uint32 to a value < 16.
+	h.counts[0][0][0][0][0] = ^uint32(0) // falseCount (max uint32)
+	h.counts[0][0][0][0][1] = 15         // trueCount
+
+	prob = h.computeSingleProb(128, 0, 0, 0, 0)
+	if prob <= 128 {
+		t.Errorf("computeSingleProb with wrapped uint32 total = %d, want > 128", prob)
+	}
 }
