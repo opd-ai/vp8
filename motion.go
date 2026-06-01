@@ -436,28 +436,28 @@ func getDiagonalNeighborIndex(mbX, mbY, mbW int) int {
 // frame plus a 32-pixel (128 quarter-pixel) border in each direction.
 // Reference: RFC 6386 §18.2, libvpx vp8/common/findnearmv.c
 func clampMVPredictor(mv motionVector, mbX, mbY, frameW, frameH int) motionVector {
-	const borderQPel = 128 // 32 pixels * 4 quarter-pixels/pixel
+	const borderQPel int64 = 128 // 32 pixels * 4 quarter-pixels/pixel
 
-	minX := int16(-mbX*64 - borderQPel)
-	maxX := int16((frameW-(mbX+1)*16)*4 + borderQPel)
-	minY := int16(-mbY*64 - borderQPel)
-	maxY := int16((frameH-(mbY+1)*16)*4 + borderQPel)
+	minX := -int64(mbX)*64 - borderQPel
+	maxX := (int64(frameW)-int64(mbX+1)*16)*4 + borderQPel
+	minY := -int64(mbY)*64 - borderQPel
+	maxY := (int64(frameH)-int64(mbY+1)*16)*4 + borderQPel
 
-	dx := mv.dx
+	dx := int64(mv.dx)
 	if dx < minX {
 		dx = minX
 	} else if dx > maxX {
 		dx = maxX
 	}
 
-	dy := mv.dy
+	dy := int64(mv.dy)
 	if dy < minY {
 		dy = minY
 	} else if dy > maxY {
 		dy = maxY
 	}
 
-	return motionVector{dx: dx, dy: dy}
+	return motionVector{dx: int16(dx), dy: int16(dy)}
 }
 
 // mvCost estimates the bit cost of encoding a motion vector difference.
