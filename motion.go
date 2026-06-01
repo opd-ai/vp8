@@ -314,7 +314,7 @@ type mvCandidates struct {
 
 // addCandidate adds or increments a motion vector candidate by the given weight.
 // Per RFC 6386 §18.2, left and above neighbors each contribute weight 2,
-// while the diagonal neighbor contributes weight 1.
+// while the diagonal neighbor contributes weight 1. Weight must be positive.
 func (c *mvCandidates) addCandidate(mv motionVector, weight int) {
 	for i := 0; i < c.n; i++ {
 		if mvEqual(mv, c.mvs[i]) {

@@ -423,7 +423,6 @@ func SelectBest8x8ChromaModeUV(
 	return bestMode
 }
 
-
 func computeSAD8x8(a, b []byte) int {
 	sad := 0
 	for i := 0; i < 64; i++ {
