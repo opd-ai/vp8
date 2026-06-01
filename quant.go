@@ -121,9 +121,8 @@ func GetQuantFactorsSimple(qi int) QuantFactors {
 
 // quantIndexToQp returns an approximate quantizer step size for a given
 // quantizer index (0..127). This follows the VP8 dequantization table.
-//
-// Deprecated: Use GetQuantFactors or GetQuantFactorsSimple for accurate
-// per-plane dequantization factors as specified in RFC 6386 §14.1.
+// Internal use only; prefer GetQuantFactors or GetQuantFactorsSimple for
+// accurate per-plane dequantization factors per RFC 6386 §14.1.
 func quantIndexToQp(qi int) int16 {
 	// Use the Y1 AC lookup table for backward compatibility
 	return acQLookup[clampQI(qi)]

@@ -239,7 +239,8 @@ func TestFindNearestMV(t *testing.T) {
 	}
 
 	// Query MB at (1, 1) - left neighbor has MV(8, 4)
-	nearest, _ := findNearestMV(mbs, 1, 1, mbW)
+	// Frame is 4*16=64 × 4*16=64 pixels (4×4 macroblock grid)
+	nearest, _ := findNearestMV(mbs, 1, 1, mbW, 64, 64)
 
 	if nearest.dx != 8 || nearest.dy != 4 {
 		t.Errorf("expected nearest=(%d,%d), got (%d,%d)", 8, 4, nearest.dx, nearest.dy)

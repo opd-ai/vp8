@@ -98,19 +98,19 @@ func ForwardWHT4x4(input [16]int16) [16]int16 {
 func QuantizeBlock(coeffs [16]int16, dcQ, acQ int16) [16]int16 {
 	var out [16]int16
 
-	// DC coefficient (index 0)
+	// DC coefficient (index 0) — use int32 for rounding to avoid overflow
 	if coeffs[0] >= 0 {
-		out[0] = (coeffs[0] + dcQ/2) / dcQ
+		out[0] = int16((int32(coeffs[0]) + int32(dcQ)/2) / int32(dcQ))
 	} else {
-		out[0] = (coeffs[0] - dcQ/2) / dcQ
+		out[0] = int16((int32(coeffs[0]) - int32(dcQ)/2) / int32(dcQ))
 	}
 
-	// AC coefficients (indices 1-15)
+	// AC coefficients (indices 1-15) — use int32 for rounding to avoid overflow
 	for i := 1; i < 16; i++ {
 		if coeffs[i] >= 0 {
-			out[i] = (coeffs[i] + acQ/2) / acQ
+			out[i] = int16((int32(coeffs[i]) + int32(acQ)/2) / int32(acQ))
 		} else {
-			out[i] = (coeffs[i] - acQ/2) / acQ
+			out[i] = int16((int32(coeffs[i]) - int32(acQ)/2) / int32(acQ))
 		}
 	}
 

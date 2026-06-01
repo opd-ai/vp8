@@ -35,7 +35,10 @@ const (
 	PlaneY1SansY2 = 3 // Y blocks in B_PRED mode (no Y2)
 )
 
-// Legacy constants for backward compatibility (deprecated, use Plane* instead)
+// Legacy constants kept for backward compatibility.
+//
+// Deprecated: Use the Plane* constants instead. These aliases will be
+// removed in the next major version.
 const (
 	BlockTypeDCY  = PlaneY1WithY2 // Deprecated: use PlaneY1WithY2
 	BlockTypeACY  = PlaneY2       // Deprecated: use PlaneY2
@@ -1017,7 +1020,7 @@ func (h *CoeffHistogram) computeSingleProb(baseProb uint8, i, j, k, l int) uint8
 	if total < 16 {
 		return baseProb
 	}
-	return clampProb((falseCount * 256) / total)
+	return clampProb(uint32(uint64(falseCount) * 256 / uint64(total)))
 }
 
 // clampProb clamps a probability value to the valid range [1, 255].

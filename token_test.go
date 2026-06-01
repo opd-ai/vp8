@@ -405,3 +405,23 @@ func TestEncoderWithProbabilityUpdates(t *testing.T) {
 		}
 	}
 }
+
+// TestCoeffHistogramOverflow verifies that computeSingleProb does not overflow
+// when histogram counts exceed 2^24 (AUDIT MEDIUM finding).
+func TestCoeffHistogramOverflow(t *testing.T) {
+	h := NewCoeffHistogram()
+
+	// falseCount * 256 would wrap in uint32 when falseCount > 2^24 ≈ 16.7M.
+	const large uint32 = (1 << 25) + 1
+	h.counts[0][0][0][0][0] = large // falseCount
+	h.counts[0][0][0][0][1] = large // trueCount
+
+	prob := h.computeSingleProb(128, 0, 0, 0, 0)
+	if prob < 1 || prob > 255 {
+		t.Errorf("computeSingleProb with large counts = %d, want in [1,255]", prob)
+	}
+	// Equal counts → probability should be close to 128
+	if prob < 64 || prob > 192 {
+		t.Errorf("computeSingleProb with equal large counts = %d, want near 128", prob)
+	}
+}

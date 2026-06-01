@@ -208,12 +208,10 @@ func evaluateBPredMode(srcY []byte, ctx *mbContext) (int, [16]intraBMode) {
 			bModes[blockIdx] = mode
 			totalSAD += sad
 
-			// Generate prediction and store in recon buffer for subsequent blocks
-			var pred [16]byte
-			Predict4x4(pred[:], above, left, mode)
+			// Store source as approximation of reconstruction for subsequent blocks
+			// (mode selection uses source residual as a cost approximation).
 			for row := 0; row < 4; row++ {
 				reconRow := (by*4 + row) * 16
-				// Use source as approximation of reconstruction for mode selection
 				copy(recon[reconRow+bx*4:reconRow+bx*4+4], src4x4[row*4:row*4+4])
 			}
 		}

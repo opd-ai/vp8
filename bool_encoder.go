@@ -80,17 +80,15 @@ func (e *boolEncoder) hasCarry(offset int) bool {
 }
 
 // propagateCarry performs carry propagation through the buffer.
+// It zeroes the trailing run of 0xff bytes, then increments the byte
+// immediately before that run.
 func (e *boolEncoder) propagateCarry() {
-	for i := len(e.buf) - 1; i >= 0 && e.buf[i] == 0xff; i-- {
+	i := len(e.buf) - 1
+	for ; i >= 0 && e.buf[i] == 0xff; i-- {
 		e.buf[i] = 0
 	}
-	if len(e.buf) > 0 {
-		for i := len(e.buf) - 1; i >= 0; i-- {
-			if e.buf[i] != 0xff {
-				e.buf[i]++
-				break
-			}
-		}
+	if i >= 0 {
+		e.buf[i]++
 	}
 }
 

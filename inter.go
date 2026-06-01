@@ -31,7 +31,7 @@ func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
 	}
 
 	// Get motion vector prediction from neighbors
-	nearestMV, _ := findNearestMV(mbs, mbX, mbY, mbW)
+	nearestMV, _ := findNearestMV(mbs, mbX, mbY, mbW, ref.Width, ref.Height)
 
 	// Perform motion estimation
 	meResult := estimateMotion(srcY, ref.Y, ref.Width, ref.Height,
