@@ -91,8 +91,12 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 	// Select best luma prediction mode
 	selectLumaMode(srcY, ctx, &mb)
 
-	// Select best 8x8 chroma prediction mode (same for U and V)
-	mb.chromaMode, _ = SelectBest8x8ChromaMode(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU)
+	// Select best 8x8 chroma prediction mode using combined U+V SAD
+	mb.chromaMode = SelectBest8x8ChromaModeUV(
+		srcU, srcV,
+		ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU,
+		ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV,
+	)
 
 	// Process Y blocks based on prediction mode
 	if mb.lumaMode == B_PRED {

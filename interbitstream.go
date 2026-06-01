@@ -162,66 +162,6 @@ var interMBModeProbs = [4]uint8{
 	// NEWMV is implicit (remaining probability)
 }
 
-// encodeInterMBMode encodes the macroblock mode for an inter-frame macroblock.
-// For macroblocks that use inter prediction, this encodes the MV mode.
-// For intra macroblocks within inter frames, this signals the intra mode.
-// Reference: RFC 6386 §11.3
-func encodeInterMBMode(enc *boolEncoder, mb *macroblock) {
-	if !mb.isInter {
-		// Intra macroblock within inter frame
-		// is_inter = false
-		enc.putBit(63, false) // P(is_inter) - inter frame probability
-		// Encode intra y_mode (same as key-frame mode tree)
-		encodeYMode(enc, mb.lumaMode, mb.bModes)
-		return
-	}
-
-	// Inter macroblock: is_inter = true
-	enc.putBit(63, true)
-
-	// Encode reference frame (Last, Golden, AltRef)
-	// For simplicity, we always use Last reference frame
-	// ref_frame tree: last vs {golden, altref}
-	switch mb.refFrame {
-	case refFrameLast:
-		enc.putBit(128, false) // last
-	case refFrameGolden:
-		enc.putBit(128, true)  // not last
-		enc.putBit(128, false) // golden
-	case refFrameAltRef:
-		enc.putBit(128, true) // not last
-		enc.putBit(128, true) // altref
-	}
-
-	// Encode inter prediction mode
-	// Mode tree: NEARESTMV vs {NEARMV, ZEROMV, NEWMV}
-	switch mb.interMode {
-	case mvModeNearestMV:
-		enc.putBit(interMBModeProbs[0], false) // NEARESTMV
-	case mvModeNearMV:
-		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
-		enc.putBit(interMBModeProbs[1], false) // NEARMV
-	case mvModeZeroMV:
-		enc.putBit(interMBModeProbs[0], true)  // not NEARESTMV
-		enc.putBit(interMBModeProbs[1], true)  // not NEARMV
-		enc.putBit(interMBModeProbs[2], false) // ZEROMV
-	case mvModeNewMV:
-		enc.putBit(interMBModeProbs[0], true) // not NEARESTMV
-		enc.putBit(interMBModeProbs[1], true) // not NEARMV
-		enc.putBit(interMBModeProbs[2], true) // NEWMV
-	}
-
-	// If NEWMV, encode the motion vector difference
-	if mb.interMode == mvModeNewMV {
-		// The MV must be encoded as delta from the predicted MV (typically
-		// derived from neighboring macroblocks), so that the decoder, which
-		// uses the same predictor, reconstructs the correct absolute MV.
-		// The caller is responsible for setting mb.predMV to the chosen
-		// predictor during inter processing.
-		encodeMV(enc, mb.mv, mb.predMV)
-	}
-}
-
 // encodeInterFrameHeader encodes the VP8 inter-frame (P-frame) header into
 // the first partition. Inter-frame headers differ from key-frame headers in
 // several ways per RFC 6386 §9.

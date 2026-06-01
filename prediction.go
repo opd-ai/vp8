@@ -397,7 +397,33 @@ func SelectBest8x8ChromaMode(src, above, left []byte, topLeft byte) (chromaMode,
 	return bestMode, bestSAD
 }
 
-// computeSAD8x8 computes Sum of Absolute Differences between two 8x8 blocks.
+// SelectBest8x8ChromaModeUV evaluates all 8x8 chroma prediction modes for both
+// the U and V planes and returns the mode with the lowest combined SAD.
+// Using combined U+V SAD avoids mode thrashing when the two planes disagree.
+func SelectBest8x8ChromaModeUV(
+	srcU, srcV []byte,
+	aboveU, leftU []byte, topLeftU byte,
+	aboveV, leftV []byte, topLeftV byte,
+) chromaMode {
+	var predU, predV [64]byte
+	bestMode := DC_PRED_CHROMA
+	bestSAD := 1 << 30
+
+	modes := []chromaMode{DC_PRED_CHROMA, V_PRED_CHROMA, H_PRED_CHROMA, TM_PRED_CHROMA}
+	for _, mode := range modes {
+		Predict8x8Chroma(predU[:], aboveU, leftU, topLeftU, mode)
+		Predict8x8Chroma(predV[:], aboveV, leftV, topLeftV, mode)
+		sad := computeSAD8x8(srcU, predU[:]) + computeSAD8x8(srcV, predV[:])
+		if sad < bestSAD {
+			bestSAD = sad
+			bestMode = mode
+		}
+	}
+
+	return bestMode
+}
+
+
 func computeSAD8x8(a, b []byte) int {
 	sad := 0
 	for i := 0; i < 64; i++ {
