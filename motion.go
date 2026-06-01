@@ -312,17 +312,19 @@ type mvCandidates struct {
 	n     int
 }
 
-// addCandidate adds or increments a motion vector candidate.
-func (c *mvCandidates) addCandidate(mv motionVector) {
+// addCandidate adds or increments a motion vector candidate by the given weight.
+// Per RFC 6386 §18.2, left and above neighbors each contribute weight 2,
+// while the diagonal neighbor contributes weight 1. Weight must be positive.
+func (c *mvCandidates) addCandidate(mv motionVector, weight int) {
 	for i := 0; i < c.n; i++ {
 		if mvEqual(mv, c.mvs[i]) {
-			c.count[i]++
+			c.count[i] += weight
 			return
 		}
 	}
 	if c.n < 3 {
 		c.mvs[c.n] = mv
-		c.count[c.n] = 1
+		c.count[c.n] = weight
 		c.n++
 	}
 }
@@ -363,46 +365,55 @@ func (c *mvCandidates) findMaxCountIndex(skipIdx int) int {
 // and near motion vectors, which are used as predictors for the current MB.
 //
 // VP8 uses up to 3 neighbors: left, above, and above-right (or above-left).
+// Left and above each contribute weight 2; the diagonal neighbor contributes 1.
+// The most-weighted MV is "nearest"; the second is "near". The nearest
+// predictor is then clamped to the valid range per RFC 6386 §18.2.
+//
 // Reference: RFC 6386 §18.2 – Motion Vector Prediction
-func findNearestMV(mbs []macroblock, mbX, mbY, mbW int) (nearest, near motionVector) {
+func findNearestMV(mbs []macroblock, mbX, mbY, mbW, frameW, frameH int) (nearest, near motionVector) {
 	var cand mvCandidates
 
 	collectLeftNeighborMV(&cand, mbs, mbX, mbY, mbW)
 	collectAboveNeighborMV(&cand, mbs, mbX, mbY, mbW)
 	collectDiagonalNeighborMV(&cand, mbs, mbX, mbY, mbW)
 
-	return cand.selectBestTwo()
+	nearest, near = cand.selectBestTwo()
+	nearest = clampMVPredictor(nearest, mbX, mbY, frameW, frameH)
+	return nearest, near
 }
 
 // collectLeftNeighborMV adds the left neighbor's MV if available.
+// Left neighbor contributes weight 2 per RFC 6386 §18.2.
 func collectLeftNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
 	if mbX > 0 {
 		leftIdx := mbY*mbW + (mbX - 1)
 		if mbs[leftIdx].isInter {
-			cand.addCandidate(mbs[leftIdx].mv)
+			cand.addCandidate(mbs[leftIdx].mv, 2)
 		}
 	}
 }
 
 // collectAboveNeighborMV adds the above neighbor's MV if available.
+// Above neighbor contributes weight 2 per RFC 6386 §18.2.
 func collectAboveNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
 	if mbY > 0 {
 		aboveIdx := (mbY-1)*mbW + mbX
 		if mbs[aboveIdx].isInter {
-			cand.addCandidate(mbs[aboveIdx].mv)
+			cand.addCandidate(mbs[aboveIdx].mv, 2)
 		}
 	}
 }
 
 // collectDiagonalNeighborMV adds the diagonal neighbor's MV if available.
 // Uses above-right, or above-left if at the right edge.
+// Diagonal neighbor contributes weight 1 per RFC 6386 §18.2.
 func collectDiagonalNeighborMV(cand *mvCandidates, mbs []macroblock, mbX, mbY, mbW int) {
 	if mbY == 0 {
 		return
 	}
 	diagIdx := getDiagonalNeighborIndex(mbX, mbY, mbW)
 	if diagIdx >= 0 && mbs[diagIdx].isInter {
-		cand.addCandidate(mbs[diagIdx].mv)
+		cand.addCandidate(mbs[diagIdx].mv, 1)
 	}
 }
 
@@ -416,6 +427,37 @@ func getDiagonalNeighborIndex(mbX, mbY, mbW int) int {
 		return (mbY-1)*mbW + (mbX - 1) // above-left
 	}
 	return -1
+}
+
+// clampMVPredictor clamps an MV predictor to the valid range for a given
+// macroblock position, matching vp8_clamp_mv2 in the reference decoder.
+//
+// The clamp ensures the predictor does not reference pixels outside the
+// frame plus a 32-pixel (128 quarter-pixel) border in each direction.
+// Reference: RFC 6386 §18.2, libvpx vp8/common/findnearmv.c
+func clampMVPredictor(mv motionVector, mbX, mbY, frameW, frameH int) motionVector {
+	const borderQPel int64 = 128 // 32 pixels * 4 quarter-pixels/pixel
+
+	minX := -int64(mbX)*64 - borderQPel
+	maxX := (int64(frameW)-int64(mbX+1)*16)*4 + borderQPel
+	minY := -int64(mbY)*64 - borderQPel
+	maxY := (int64(frameH)-int64(mbY+1)*16)*4 + borderQPel
+
+	dx := int64(mv.dx)
+	if dx < minX {
+		dx = minX
+	} else if dx > maxX {
+		dx = maxX
+	}
+
+	dy := int64(mv.dy)
+	if dy < minY {
+		dy = minY
+	} else if dy > maxY {
+		dy = maxY
+	}
+
+	return motionVector{dx: int16(dx), dy: int16(dy)}
 }
 
 // mvCost estimates the bit cost of encoding a motion vector difference.

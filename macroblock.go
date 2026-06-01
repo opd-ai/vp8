@@ -91,8 +91,12 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 	// Select best luma prediction mode
 	selectLumaMode(srcY, ctx, &mb)
 
-	// Select best 8x8 chroma prediction mode (same for U and V)
-	mb.chromaMode, _ = SelectBest8x8ChromaMode(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU)
+	// Select best 8x8 chroma prediction mode using combined U+V SAD
+	mb.chromaMode = SelectBest8x8ChromaModeUV(
+		srcU, srcV,
+		ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU,
+		ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV,
+	)
 
 	// Process Y blocks based on prediction mode
 	if mb.lumaMode == B_PRED {
@@ -208,12 +212,10 @@ func evaluateBPredMode(srcY []byte, ctx *mbContext) (int, [16]intraBMode) {
 			bModes[blockIdx] = mode
 			totalSAD += sad
 
-			// Generate prediction and store in recon buffer for subsequent blocks
-			var pred [16]byte
-			Predict4x4(pred[:], above, left, mode)
+			// Store source as approximation of reconstruction for subsequent blocks
+			// (mode selection uses source residual as a cost approximation).
 			for row := 0; row < 4; row++ {
 				reconRow := (by*4 + row) * 16
-				// Use source as approximation of reconstruction for mode selection
 				copy(recon[reconRow+bx*4:reconRow+bx*4+4], src4x4[row*4:row*4+4])
 			}
 		}

@@ -31,7 +31,7 @@ func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
 	}
 
 	// Get motion vector prediction from neighbors
-	nearestMV, _ := findNearestMV(mbs, mbX, mbY, mbW)
+	nearestMV, _ := findNearestMV(mbs, mbX, mbY, mbW, ref.Width, ref.Height)
 
 	// Perform motion estimation
 	meResult := estimateMotion(srcY, ref.Y, ref.Width, ref.Height,
@@ -75,14 +75,29 @@ func processInterMacroblock(srcY, srcU, srcV []byte, ref *refFrameBuffer,
 		processInterChromaBlocks(srcU, predU[:], &mb, qf, true)
 		processInterChromaBlocks(srcV, predV[:], &mb, qf, false)
 	} else {
-		// Intra mode wins — encode as intra within the inter frame
+		// Intra mode wins — encode as intra within the inter frame.
+		// Evaluate both 16x16 and B_PRED (4x4) modes to pick the best.
 		mb.isInter = false
-		mb.lumaMode = best16x16Mode
-		chromaMode, _ := SelectBest8x8ChromaMode(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU)
+		bpredSAD, bModes := evaluateBPredMode(srcY, ctx)
+		if bpredSAD*100 < intraSAD*bPredSADThreshold {
+			mb.lumaMode = B_PRED
+			mb.bModes = bModes
+		} else {
+			mb.lumaMode = best16x16Mode
+		}
+		chromaMode := SelectBest8x8ChromaModeUV(
+			srcU, srcV,
+			ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU,
+			ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV,
+		)
 		mb.chromaMode = chromaMode
 
 		// Process using the standard intra pipeline
-		processYBlocks16x16(srcY, ctx, &mb, qf)
+		if mb.lumaMode == B_PRED {
+			processYBlocksBPred(srcY, ctx, &mb, qf)
+		} else {
+			processYBlocks16x16(srcY, ctx, &mb, qf)
+		}
 		processIntraChromaInInterFrame(srcU, srcV, ctx, &mb, qf)
 	}
 

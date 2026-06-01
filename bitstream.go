@@ -229,57 +229,6 @@ func encodeYModeWithContext(enc *boolEncoder, mode intraMode, bModes [16]intraBM
 	}
 }
 
-// encodeYMode encodes the 16x16 luma prediction mode using the VP8 mode tree.
-// When mode is B_PRED, it also encodes the 16 sub-block modes.
-// Reference: RFC 6386 §11.2
-// Decoder reads: readBit(145) -> if false: B_PRED mode (parse 16 sub-block modes)
-//
-//	-> if true: 16x16 mode, then parse which mode
-func encodeYMode(enc *boolEncoder, mode intraMode, bModes [16]intraBMode) {
-	// Key-frame y_mode probabilities (from decoder)
-	const prob16x16 = 145 // true = 16x16 mode, false = B_PRED
-	const probDCvsRest = 156
-	const probDCvsV = 163
-	const probHvsT = 128
-
-	if mode == B_PRED {
-		// B_PRED: readBit(145) returns false
-		enc.putBit(prob16x16, false)
-		// Encode 16 sub-block modes
-		encodeBPredModes(enc, bModes)
-		return
-	}
-
-	// 16x16 mode: readBit(145) returns true
-	enc.putBit(prob16x16, true)
-
-	// Decoder tree after 16x16 is confirmed:
-	// !readBit(156) -> DC or V
-	//   !readBit(163) -> DC
-	//   readBit(163) -> V
-	// readBit(156) -> H or TM
-	//   !readBit(128) -> H
-	//   readBit(128) -> TM
-
-	if mode == DC_PRED || mode == V_PRED {
-		enc.putBit(probDCvsRest, false) // DC or V branch
-		if mode == DC_PRED {
-			enc.putBit(probDCvsV, false) // DC
-		} else {
-			enc.putBit(probDCvsV, true) // V
-		}
-		return
-	}
-
-	// H or TM
-	enc.putBit(probDCvsRest, true) // H or TM branch
-	if mode == H_PRED {
-		enc.putBit(probHvsT, false) // H
-	} else {
-		enc.putBit(probHvsT, true) // TM
-	}
-}
-
 // kfBModeProb contains the key-frame sub-block mode probabilities.
 // First index is above mode, second index is left mode, matching the decoder's
 // predProb[above][left] indexing (golang.org/x/image/vp8/pred.go).
