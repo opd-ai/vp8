@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Module** | `github.com/opd-ai/vp8` |
-| **Purpose** | Pure-Go VP8 encoder supporting I-frames and P-frames with motion estimation |
+| **Purpose** | Pure-Go VP8 encoder supporting I-frames and P-frames with motion estimation (note: `FrameType.InterFrame` is still documented as “not supported” in `frame.go:9-12`, which likely needs updating) |
 | **Target users** | Go developers needing VP8 encoding for WebRTC (pion/rtp) and media applications |
 | **Deployment model** | Library — imported as a Go package |
 | **Go version** | 1.25.0 |
