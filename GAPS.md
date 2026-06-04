@@ -3,9 +3,9 @@
 ## 1. MV Prediction Algorithm Deviates from RFC 6386 §18.2
 
 - **Stated Goal**: RFC 6386 compliant VP8 encoding
-- **Current State**: The encoder uses a frequency-based nearest/near MV candidate selection (`motion.go:268-340`) — it collects candidates from left, above, and above-right neighbors and selects the most common. RFC 6386 §18.2 specifies a weighted accumulation algorithm with specific priority ordering and tie-breaking rules for the `nearest_mv` and `near_mv` values communicated to the decoder.
-- **Impact**: The encoder still produces valid VP8 bitstreams (the decoder doesn't enforce how the encoder selected MVs), but MV coding efficiency is reduced. The predictor mismatch means MVs are coded as larger deltas than necessary, increasing bitstream size for equivalent quality.
-- **Closing the Gap**: Implement the RFC 6386 §18.2 algorithm: scan left, above, and above-left neighbors with spec-defined weights, accumulate into `cnt[]` array, and apply the spec's sorting/selection logic to produce `nearest_mv` and `near_mv`.
+- **Current State**: `findNearestMV` implements a weighted candidate count (left/above weight 2, diagonal weight 1) and clamps the chosen predictor (`motion.go:316-382`). If its selection/tie-breaking differs from RFC 6386 §18.2 / libvpx, the encoder and decoder can compute different predictors.
+- **Impact**: For `MV_NEW`, the bitstream encodes only the delta from the decoder-defined predictor (`encodeMV` in `interbitstream.go:146-154`). If the encoder’s predictor differs, the decoder reconstructs a different MV (`pred_decoder + delta`), corrupting inter-frame prediction. Even when predictors match, suboptimal predictors increase MV delta size and bitstream size.
+- **Closing the Gap**: Verify predictor behavior against a reference decoder (e.g., libvpx `vp8_find_near_mvs`) and adjust `findNearestMV` selection/tie-breaking to match RFC 6386 §18.2 (diagonal neighbor is above-right, or above-left at the right edge), ensuring `mb.predMV` matches the decoder’s predictor for `MV_NEW`.
 
 ## 2. Inter-Frame Output Not Decode-Validated
 
