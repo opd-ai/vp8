@@ -419,7 +419,9 @@ func TestMultiPartitionEncode(t *testing.T) {
 			}
 
 			// Set partition count
-			enc.SetPartitionCount(tt.partitions)
+			if err := enc.SetPartitionCount(tt.partitions); err != nil {
+				t.Fatalf("SetPartitionCount: %v", err)
+			}
 
 			// Create source YUV frame
 			srcYUV := makeYUV420(tt.width, tt.height, 128)

@@ -1,8 +1,23 @@
 package vp8
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
-var debugMB = false // Set to true to debug macroblock mode selection
+var (
+	debugMBMutex sync.RWMutex
+	debugMB      = false // Set to true to debug macroblock mode selection
+)
+
+// isDebugMB reads the debugMB flag under the read lock without defer,
+// avoiding closure and defer overhead in hot macroblock paths.
+func isDebugMB() bool {
+	debugMBMutex.RLock()
+	v := debugMB
+	debugMBMutex.RUnlock()
+	return v
+}
 
 // macroblock holds the data for one 16x16 VP8 macroblock.
 type macroblock struct {
@@ -109,7 +124,7 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 	processChromaPlane(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU, mb.chromaMode, mb.uCoeffs[:], &mb.skip, qf)
 	processChromaPlane(srcV, ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV, mb.chromaMode, mb.vCoeffs[:], &mb.skip, qf)
 
-	if debugMB && mb.lumaMode != B_PRED {
+	if isDebugMB() && mb.lumaMode != B_PRED {
 		fmt.Printf(", skip=%v\n", mb.skip)
 	}
 
@@ -124,12 +139,12 @@ func selectLumaMode(srcY []byte, ctx *mbContext, mb *macroblock) {
 	if bpredSAD*100 < best16x16SAD*bPredSADThreshold {
 		mb.lumaMode = B_PRED
 		mb.bModes = bModes
-		if debugMB {
+		if isDebugMB() {
 			fmt.Printf("MB: B_PRED (SAD=%d < 16x16 SAD=%d * %d%%)\n", bpredSAD, best16x16SAD, bPredSADThreshold)
 		}
 	} else {
 		mb.lumaMode = best16x16Mode
-		if debugMB {
+		if isDebugMB() {
 			fmt.Printf("MB: %v (SAD=%d, bpred SAD=%d)", best16x16Mode, best16x16SAD, bpredSAD)
 		}
 	}
@@ -235,8 +250,10 @@ func build4x4Context(by, bx int, ctx *mbContext, recon []byte) (above, left []by
 	// above[1..4] = A[0..3] (4 pixels directly above)
 	// above[5..8] = A[4..7] (4 extra pixels for LD/VL modes)
 
-	above = make([]byte, 9)
-	left = make([]byte, 4)
+	var aboveBuf [9]byte
+	var leftBuf [4]byte
+	above = aboveBuf[:]
+	left = leftBuf[:]
 
 	above[0] = build4x4TopLeft(by, bx, ctx, recon)
 	build4x4Above(above, by, bx, ctx, recon)

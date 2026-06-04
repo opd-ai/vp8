@@ -181,7 +181,7 @@ func smallDiamondSearch(srcY, ref []byte, refW, refH, mbX, mbY int, startMV moti
 	bestMV := startMV
 	bestSAD := startSAD
 
-	for {
+	for i := 0; i < 100; i++ {
 		improved := false
 		for _, delta := range smallDiamond {
 			newMV, newSAD, found := evaluateMVCandidate(srcY, ref, refW, refH, mbX, mbY, bestMV, delta, bestSAD)

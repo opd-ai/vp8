@@ -52,6 +52,11 @@ func encodeMVComponent(enc *boolEncoder, val int16, probs [19]uint8) {
 		absVal = -absVal
 	}
 
+	// Clamp absVal to valid range (10 bits max, 0-1023)
+	if absVal > 1023 {
+		absVal = 1023
+	}
+
 	if absVal < 8 {
 		// Short encoding (magnitude 0..7): use 7-node tree at probs[2..8]
 		enc.putBit(probs[0], false) // is_short = false (short)

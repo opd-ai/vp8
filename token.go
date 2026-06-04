@@ -323,6 +323,14 @@ func tokenFromValue(v int) int {
 // probs: probability table for [is_zero, is_one, ...]
 // value: the coefficient value
 // Returns the token type for context tracking.
+// encodeCoeffValue encodes a single coefficient value with skip-bit handling.
+// This is the primary code path used by encodeCoefficients during block encoding.
+// It skips the probability tree's EOB decision point (starts at probs[1] instead of probs[0])
+// because the caller handles the "has coefficients" signal separately via encodeContinueBit.
+//
+// Related: EncodeToken implements an alternative code path for single-token
+// encoding with histogram recording. Both paths encode the token value tree identically
+// after the initial decisions, but EncodeToken always starts from probs[0] (EOB decision).
 func (te *TokenEncoder) encodeCoeffValue(probs *[11]uint8, value int16) int {
 	absVal := int(value)
 	if absVal < 0 {
@@ -443,6 +451,13 @@ func (te *TokenEncoder) encodeCat3Plus(probs *[11]uint8, token, absVal int) {
 // coeffIdx: coefficient position in zigzag order (0-15)
 // context: based on previous token
 // Returns the token type for context tracking.
+// EncodeToken encodes a single coefficient token value with histogram recording.
+// This is used for one-off token encoding operations.
+// Note: This always starts from probs[0] (EOB decision), unlike encodeCoeffValue
+// which starts from probs[1] for use within block coefficient loops.
+// Both paths produce identical token encodings; the difference is in whether the
+// EOB decision point is handled by this function or the caller.
+// See encodeCoeffValue for the complementary code path.
 func (te *TokenEncoder) EncodeToken(blockType, coeffIdx, context int, value int16) int {
 	band := coeffBand[coeffIdx]
 	probs := &te.coeffProbs[blockType][band][context]

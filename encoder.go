@@ -35,6 +35,15 @@ import (
 	"fmt"
 )
 
+var (
+	ErrInvalidDimensions      = errors.New("width and height must be positive and even")
+	ErrInvalidPartitionCount  = errors.New("partition count must be 0-3 (OnePartition through EightPartitions)")
+	ErrInvalidQuantizerIndex  = errors.New("quantizer index must be 0-127")
+	ErrInvalidBitrate         = errors.New("bitrate must be positive")
+	ErrInvalidKeyFrameInterval = errors.New("key frame interval must be non-negative")
+	ErrInvalidLoopFilterLevel = errors.New("loop filter level must be 0-63")
+)
+
 // Encoder encodes raw YUV420 frames into VP8 key-frame bitstreams.
 type Encoder struct {
 	width   int
@@ -197,8 +206,14 @@ func (e *Encoder) ForceGoldenFrame() {
 //
 // Valid values: OnePartition, TwoPartitions, FourPartitions, EightPartitions.
 // Default is OnePartition.
-func (e *Encoder) SetPartitionCount(count PartitionCount) {
+//
+// Returns ErrInvalidPartitionCount if count is not one of the valid values.
+func (e *Encoder) SetPartitionCount(count PartitionCount) error {
+	if count < OnePartition || count > EightPartitions {
+		return ErrInvalidPartitionCount
+	}
 	e.partitionCount = count
+	return nil
 }
 
 // SetProbabilityUpdates enables or disables adaptive coefficient probability updates.

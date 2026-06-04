@@ -708,8 +708,11 @@ var errFirstPartitionTooLarge = fmt.Errorf("first partition size exceeds 19-bit 
 
 // buildFrameTag constructs the 3-byte VP8 frame tag.
 // frameType: 0=key frame, 1=inter frame
-// Returns an error if firstPartSize exceeds the 19-bit limit (524,287 bytes).
+// Returns an error if firstPartSize is negative or exceeds the 19-bit limit (524,287 bytes).
 func buildFrameTag(frameType, firstPartSize int) ([3]byte, error) {
+	if firstPartSize < 0 {
+		return [3]byte{}, fmt.Errorf("first partition size cannot be negative (%d)", firstPartSize)
+	}
 	if firstPartSize > maxFirstPartSize {
 		return [3]byte{}, errFirstPartitionTooLarge
 	}
