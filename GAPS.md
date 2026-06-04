@@ -24,6 +24,6 @@
 ## 4. No Input Validation at API Boundary for Frame Data
 
 - **Stated Goal**: Usable encoder library for Go developers
-- **Current State**: `NewYUV420Frame` (`frame.go:29`) accepts any width/height without validation. `SetPartitionCount` (`encoder.go:200`) accepts arbitrary integer values without range checking. `NewEncoder` doesn't validate even dimensions (only checked later in `Encode()`). These deferred validations mean callers get errors deep in the encoding pipeline rather than at the configuration point.
-- **Impact**: Poor developer experience — errors are reported far from where the invalid configuration was set, making debugging harder. A caller might configure an encoder, process significant data, and only discover the configuration was invalid when `Encode()` is called.
-- **Closing the Gap**: Move all validation to the construction/configuration API boundary: validate dimensions in `NewEncoder` and `NewYUV420Frame`, validate partition count in `SetPartitionCount`, and return errors immediately for invalid configurations.
+- **Current State**: `NewYUV420Frame` and `NewEncoder` already validate that dimensions are positive even integers (`frame.go:31-33`, `encoder.go:95-100`). However, `SetPartitionCount` (`encoder.go:200`) accepts arbitrary values without range checking, so invalid counts can be stored and only fail later during encoding/bitstream assembly.
+- **Impact**: Poor developer experience — invalid partition configurations can surface far from where they were set, making debugging harder.
+- **Closing the Gap**: Validate partition count in `SetPartitionCount` (and/or `PartitionCount.NumPartitions`) and return an error immediately for values outside the VP8-supported set {1, 2, 4, 8}.
