@@ -328,7 +328,7 @@ func tokenFromValue(v int) int {
 // It skips the probability tree's EOB decision point (starts at probs[1] instead of probs[0])
 // because the caller handles the "has coefficients" signal separately via encodeContinueBit.
 //
-// Related: EncodeToken (line 446) implements an alternative code path for single-token
+// Related: EncodeToken implements an alternative code path for single-token
 // encoding with histogram recording. Both paths encode the token value tree identically
 // after the initial decisions, but EncodeToken always starts from probs[0] (EOB decision).
 func (te *TokenEncoder) encodeCoeffValue(probs *[11]uint8, value int16) int {

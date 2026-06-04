@@ -10,6 +10,15 @@ var (
 	debugMB      = false // Set to true to debug macroblock mode selection
 )
 
+// isDebugMB reads the debugMB flag under the read lock without defer,
+// avoiding closure and defer overhead in hot macroblock paths.
+func isDebugMB() bool {
+	debugMBMutex.RLock()
+	v := debugMB
+	debugMBMutex.RUnlock()
+	return v
+}
+
 // macroblock holds the data for one 16x16 VP8 macroblock.
 type macroblock struct {
 	lumaMode   intraMode
@@ -115,7 +124,7 @@ func processMacroblock(srcY, srcU, srcV []byte, ctx *mbContext, qf QuantFactors)
 	processChromaPlane(srcU, ctx.chromaAboveU, ctx.chromaLeftU, ctx.chromaTopLeftU, mb.chromaMode, mb.uCoeffs[:], &mb.skip, qf)
 	processChromaPlane(srcV, ctx.chromaAboveV, ctx.chromaLeftV, ctx.chromaTopLeftV, mb.chromaMode, mb.vCoeffs[:], &mb.skip, qf)
 
-	if func() bool { debugMBMutex.RLock(); defer debugMBMutex.RUnlock(); return debugMB }() && mb.lumaMode != B_PRED {
+	if isDebugMB() && mb.lumaMode != B_PRED {
 		fmt.Printf(", skip=%v\n", mb.skip)
 	}
 
@@ -130,12 +139,12 @@ func selectLumaMode(srcY []byte, ctx *mbContext, mb *macroblock) {
 	if bpredSAD*100 < best16x16SAD*bPredSADThreshold {
 		mb.lumaMode = B_PRED
 		mb.bModes = bModes
-		if func() bool { debugMBMutex.RLock(); defer debugMBMutex.RUnlock(); return debugMB }() {
+		if isDebugMB() {
 			fmt.Printf("MB: B_PRED (SAD=%d < 16x16 SAD=%d * %d%%)\n", bpredSAD, best16x16SAD, bPredSADThreshold)
 		}
 	} else {
 		mb.lumaMode = best16x16Mode
-		if func() bool { debugMBMutex.RLock(); defer debugMBMutex.RUnlock(); return debugMB }() {
+		if isDebugMB() {
 			fmt.Printf("MB: %v (SAD=%d, bpred SAD=%d)", best16x16Mode, best16x16SAD, bpredSAD)
 		}
 	}

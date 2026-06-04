@@ -206,6 +206,8 @@ func (e *Encoder) ForceGoldenFrame() {
 //
 // Valid values: OnePartition, TwoPartitions, FourPartitions, EightPartitions.
 // Default is OnePartition.
+//
+// Returns ErrInvalidPartitionCount if count is not one of the valid values.
 func (e *Encoder) SetPartitionCount(count PartitionCount) error {
 	if count < OnePartition || count > EightPartitions {
 		return ErrInvalidPartitionCount
