@@ -76,7 +76,7 @@ _No HIGH findings._
 
 - [ ] **LOW-6: `buildFrameTag` accepts negative `firstPartSize`** — `bitstream.go:712-721` — API — The function checks `firstPartSize > maxFirstPartSize` but not `firstPartSize < 0`. A negative value would underflow when cast to `uint32`, producing a garbage frame tag. In practice, `firstPartSize` is always `len(firstPart)` which is non-negative. **Remediation:** Add `if firstPartSize < 0` guard. Validate with `go test -race ./...`.
 
-- [ ] **LOW-7: `NewEncoder` does not validate odd dimensions** — `encoder.go:108-120` — API — `NewEncoder` checks `width <= 0 || height <= 0` but the comment and `buildKeyFrameWithProbs` (line 644) also require dimensions to be even (`width%2 != 0 || height%2 != 0`). `NewEncoder` does not enforce this — a caller could create an encoder with odd dimensions and only get an error at `Encode()` time. **Remediation:** Move the even-dimension check to `NewEncoder`. Validate with `go test -race ./...`.
+- [ ] **LOW-7: `NewEncoder` validates odd dimensions (WITHDRAWN)** — `encoder.go:94-104` — API — `NewEncoder` already rejects odd dimensions (`width%2 != 0 || height%2 != 0`), so this is not an API validation gap. _(Withdrawn.)_
 
 - [ ] **LOW-8: `PartitionCount` type allows arbitrary values** — `partition.go:10-17` — API — `PartitionCount` is defined as `int` with constants 0–3. Nothing prevents callers from using values outside this range (e.g., `encoder.SetPartitionCount(10)`). The `NumPartitions()` method computes `1 << int(pc)` which for pc=10 gives 1024, far exceeding the VP8 spec. Related to MEDIUM-3. **Remediation:** Validate in `NumPartitions()` or make the type unexported. Validate with `go test -race ./...`.
 
