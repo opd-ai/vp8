@@ -1,25 +1,29 @@
-# Implementation Gaps — 2026-05-30
+# Implementation Gaps — 2026-06-04
 
-## Inter‑frame motion‑vector prediction does not follow RFC 6386 §18.2
-- **Stated Goal**: The README documents inter (P) frame encoding with motion estimation and compensation, positioning the encoder for real VP8 consumers (e.g. WebRTC/WebM stacks) that use a spec‑compliant decoder.
-- **Current State**: The MV predictor (`motion.go:331` `selectBestTwo`, `motion.go:367` `findNearestMV`) picks the **most frequent** neighbor MV by a plain count. NEWMV is delta‑coded against this value (`inter.go:53`, `interbitstream.go:148-153`). A spec decoder (libvpx `vp8_find_near_mvs`) instead applies per‑neighbor weighting/merging and then **clamps** the predictor to a bounded range. Neither the weighting nor the clamping is implemented here.
-- **Impact**: For any macroblock with two or more distinct neighbor MVs — or a single large neighbor MV that the decoder would clamp — the encoder's predictor differs from the decoder's. Since the absolute MV is reconstructed as `decoderPred + delta`, a real decoder recovers the **wrong** motion vector, corrupting inter‑frame pixels. This is invisible to the current test suite because `golang.org/x/image/vp8` cannot decode non‑key frames (it returns `"vp8: Golden / AltRef frames are not implemented"`), so no test reconstructs inter‑frame pixels.
-- **Closing the Gap**: Reimplement the predictor in `motion.go` per RFC 6386 §18.2 (weighted left/above/above‑right accumulation, equal‑candidate merging, predictor clamping relative to the MB) and store the clamped result in `mb.predMV`. Add an integration test that decodes encoded P‑frames with an inter‑capable decoder (libvpx, or `ffmpeg`/`ffprobe` pixel comparison as scaffolded in `TestInterFrameFFprobe`) and asserts reconstructed‑pixel equality within tolerance.
+## 1. MV Prediction Algorithm Deviates from RFC 6386 §18.2
 
-## Inter‑frame output is not validated against any inter‑capable decoder
-- **Stated Goal**: Produce standard‑compliant VP8 bitstreams that real decoders can play back, for both key and inter frames.
-- **Current State**: Key frames are round‑trip validated via `golang.org/x/image/vp8` (`verifyKeyFrameDecodable`, `inter_test.go:870`). Inter frames are checked only for structural properties — the frame‑type bit and a minimum length (`inter_test.go:861-866`). No test decodes inter‑frame pixels because the bundled decoder rejects non‑key frames.
-- **Impact**: Bitstream‑level defects in P‑frame coding (MV prediction, mode signaling, residual context) can pass CI undetected. Finding H1 in `AUDIT.md` is a concrete example that current tests cannot catch.
-- **Closing the Gap**: Introduce an inter‑frame decode test path using a decoder that implements VP8 inter prediction (libvpx bindings or an `ffmpeg` subprocess), and compare decoded frames against the encoder's own reconstruction buffers within a PSNR/SAD tolerance.
+- **Stated Goal**: RFC 6386 compliant VP8 encoding
+- **Current State**: The encoder uses a frequency-based nearest/near MV candidate selection (`motion.go:268-340`) — it collects candidates from left, above, and above-right neighbors and selects the most common. RFC 6386 §18.2 specifies a weighted accumulation algorithm with specific priority ordering and tie-breaking rules for the `nearest_mv` and `near_mv` values communicated to the decoder.
+- **Impact**: The encoder still produces valid VP8 bitstreams (the decoder doesn't enforce how the encoder selected MVs), but MV coding efficiency is reduced. The predictor mismatch means MVs are coded as larger deltas than necessary, increasing bitstream size for equivalent quality.
+- **Closing the Gap**: Implement the RFC 6386 §18.2 algorithm: scan left, above, and above-left neighbors with spec-defined weights, accumulate into `cnt[]` array, and apply the spec's sorting/selection logic to produce `nearest_mv` and `near_mv`.
 
-## Only ZEROMV and NEWMV inter modes are emitted
-- **Stated Goal**: "Diamond search motion estimation" implying effective inter‑frame compression.
-- **Current State**: `estimateMotion` (`motion.go:112-114`) selects only `mvModeZeroMV` or `mvModeNewMV`. NEARESTMV/NEARMV candidates are collected by `findNearestMV`/`selectBestTwo` but never chosen, so every non‑zero motion pays the full NEWMV delta cost even when a neighbor MV would have coded for free.
-- **Impact**: Lower compression efficiency than a complete VP8 mode set; the collected `near` candidate is effectively dead. Correctness is unaffected.
-- **Closing the Gap**: Extend the inter mode decision in `motion.go`/`inter.go` to evaluate NEARESTMV and NEARMV (zero‑delta) against NEWMV by rate‑distortion cost, and select the cheapest. Add a size‑regression test on representative motion content.
+## 2. Inter-Frame Output Not Decode-Validated
 
-## Stale deprecation annotations without a migration path
-- **Stated Goal**: A clean, documented public API surface.
-- **Current State**: Symbols at `quant.go:125` and `token.go:40-43` carry deprecation annotations but remain exported with no documented replacement or removal version.
-- **Impact**: API consumers cannot tell which replacement to adopt or when the symbols disappear, encouraging accidental use of deprecated code.
-- **Closing the Gap**: Document the replacement symbol and intended removal version in each deprecated declaration's GoDoc, or remove the symbols if no longer used internally.
+- **Stated Goal**: Working P-frame (inter-frame) encoding with motion estimation
+- **Current State**: Tests for inter-frame encoding (`inter_test.go`) only verify structural properties: the frame-type bit is set correctly, and the output exceeds a minimum byte length. The bitstream is never decoded by a VP8 decoder to verify correctness.
+- **Impact**: Bitstream-level bugs in inter-frame encoding (incorrect MV encoding, wrong residual coefficients, invalid partition structure) would go undetected by the test suite. Users may receive corrupted video output from multi-frame sequences without any test catching the regression.
+- **Closing the Gap**: Add integration tests that decode P-frame output using an external VP8 decoder. Options: (1) CGo test build linking libvpx, (2) shell out to `ffmpeg`/`vpxdec` in tests, (3) wait for `golang.org/x/image/vp8` to support P-frame decoding.
+
+## 3. Limited Inter-Frame Prediction Modes
+
+- **Stated Goal**: Inter-frame encoding with motion estimation
+- **Current State**: The encoder implements only `MV_NEW` (explicit MV per macroblock) for inter-frame prediction (`inter.go:60-90`). VP8 supports additional inter modes: `MV_NEAREST` (use nearest MV from neighbors), `MV_NEAR` (use second-nearest), and `MV_ZERO` (zero motion). The skip mode is implemented but only for macroblocks with zero residual.
+- **Impact**: Bitstream size is significantly larger than necessary for sequences with uniform or low motion. Every macroblock encodes a full MV delta even when the optimal MV is the same as a neighbor's (which would be free with `MV_NEAREST`) or zero (free with `MV_ZERO`). This directly reduces compression efficiency.
+- **Closing the Gap**: Implement mode decision logic that evaluates `MV_ZERO`, `MV_NEAREST`, and `MV_NEAR` candidates alongside `MV_NEW` in the motion estimation pipeline. Select the mode with the best rate-distortion tradeoff.
+
+## 4. No Input Validation at API Boundary for Frame Data
+
+- **Stated Goal**: Usable encoder library for Go developers
+- **Current State**: `NewYUV420Frame` (`frame.go:29`) accepts any width/height without validation. `SetPartitionCount` (`encoder.go:200`) accepts arbitrary integer values without range checking. `NewEncoder` doesn't validate even dimensions (only checked later in `Encode()`). These deferred validations mean callers get errors deep in the encoding pipeline rather than at the configuration point.
+- **Impact**: Poor developer experience — errors are reported far from where the invalid configuration was set, making debugging harder. A caller might configure an encoder, process significant data, and only discover the configuration was invalid when `Encode()` is called.
+- **Closing the Gap**: Move all validation to the construction/configuration API boundary: validate dimensions in `NewEncoder` and `NewYUV420Frame`, validate partition count in `SetPartitionCount`, and return errors immediately for invalid configurations.
