@@ -25,8 +25,14 @@ func makeHGradient(w, h int) []byte {
 }
 
 func TestTraceHGradient32(t *testing.T) {
+	debugMBMutex.Lock()
 	debugMB = true
-	defer func() { debugMB = false }()
+	debugMBMutex.Unlock()
+	defer func() {
+		debugMBMutex.Lock()
+		debugMB = false
+		debugMBMutex.Unlock()
+	}()
 
 	width, height := 32, 32
 	srcYUV := makeHGradient(width, height)

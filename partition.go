@@ -15,7 +15,11 @@ const (
 )
 
 // NumPartitions returns the actual number of partitions.
+// Returns 1 if the partition count is invalid (not in range [0, 3]).
 func (p PartitionCount) NumPartitions() int {
+	if p < OnePartition || p > EightPartitions {
+		return 1 // Safe default for invalid values
+	}
 	return 1 << int(p)
 }
 
