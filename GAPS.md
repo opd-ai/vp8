@@ -17,7 +17,7 @@
 ## 3. Limited Inter-Frame Prediction Modes
 
 - **Stated Goal**: Inter-frame encoding with motion estimation
-- **Current State**: The encoder implements only `MV_NEW` (explicit MV per macroblock) for inter-frame prediction (`inter.go:60-90`). VP8 supports additional inter modes: `MV_NEAREST` (use nearest MV from neighbors), `MV_NEAR` (use second-nearest), and `MV_ZERO` (zero motion). The skip mode is implemented but only for macroblocks with zero residual.
+- **Current State**: The encoder’s motion estimation currently selects only `MV_ZERO` (zero motion) or `MV_NEW` (explicit MV per macroblock) (`motion.go:85-118`, used by `inter.go:33-55`). VP8 also supports `MV_NEAREST` and `MV_NEAR`, and while those modes are encodable (`interbitstream.go:292-307`), the encoder never selects them during mode decision.
 - **Impact**: Bitstream size is significantly larger than necessary for sequences with uniform or low motion. Every macroblock encodes a full MV delta even when the optimal MV is the same as a neighbor's (which would be free with `MV_NEAREST`) or zero (free with `MV_ZERO`). This directly reduces compression efficiency.
 - **Closing the Gap**: Implement mode decision logic that evaluates `MV_ZERO`, `MV_NEAREST`, and `MV_NEAR` candidates alongside `MV_NEW` in the motion estimation pipeline. Select the mode with the best rate-distortion tradeoff.
 
